@@ -52,6 +52,13 @@ ISR(TIMER2_COMPA_vect) {
   SPI.transfer(dac_out & 255);
   digitalWrite(10, HIGH);
 
+  uint16_t dac_outb = (1 << 15) | (1 << 14) | (1 << 13) | (1 << 12) | ( sample_out << 4 );
+  digitalWrite(10, LOW);
+  SPI.transfer(dac_outb >> 8);
+  SPI.transfer(dac_outb & 255);
+  digitalWrite(10, HIGH);
+
+
   ///////////////////////////////////////////////////////////////////////////////
 
   if (playmode == 0) {
