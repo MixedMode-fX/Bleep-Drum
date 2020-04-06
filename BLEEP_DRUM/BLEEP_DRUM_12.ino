@@ -13,10 +13,21 @@ It is no longer necessary to edit MIDI.h
 */
 
 
+// Pinout
+#define PLAY 8
+#define REC 19
+#define TAP 18
+#define SHIFT 17
 
-// !!
-// Most problems compiling come from having an old version of the midi library of multiple ones installed.
-// !!
+#define red_pin 6
+#define blue_pin 2
+#define green_pin 3
+#define yellow_pin 4
+
+#define LED_GREEN 9
+
+
+
 
 #include <MIDI.h>
 MIDI_CREATE_DEFAULT_INSTANCE();
@@ -28,9 +39,9 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 
 #ifdef DAM
 #include "samples_dam.h"
-#elseif DAM2
+#elif DAM2
 #include "samples_dam2.h"
-#elseif DAM3
+#elif DAM3
 #include "samples_dam3.h"
 #else
 #include "samples_bleep.h"
@@ -147,23 +158,6 @@ byte  mnote, mvelocity, miditap, pmiditap, miditap2, midistep, pmidistep, midite
 
 unsigned long recordoffsettimer, offsetamount, taptempof;
 int potX;
-
-#define PLAY 8
-#define REC 19
-#define TAP 18
-#define SHIFT 17
-
-// #define REC 28
-// #define TAP 27
-// #define SHIFT 26
-
-
-#define red_pin 6
-#define blue_pin 2
-#define green_pin 3
-#define yellow_pin 4
-
-#define LED_GREEN 9
 
 void setup() {
   //dac.setGain(1);
