@@ -2,17 +2,7 @@ ISR(TIMER2_COMPA_vect) {
   OCR2A = 40;
 
 
-  if (playmode == 0) { //reverse
-    snare_sample = (pgm_read_byte(&snare_table[(indexr)])) - 127;
-    kick_sample = (pgm_read_byte(&kick_table[(index2r)])) - 127;
-    hat_sample = (pgm_read_byte(&tick_table[(index3r)])) - 127;
-    bass_sample = (((pgm_read_byte(&bass_table[(index4r)])))) - 127;
-
-    B1_freq_sample = pgm_read_byte(&tick_table[(index2vr)]) - 127;
-    B2_freq_sample = (pgm_read_byte(&bass_table[(index4vr)])) - 127;
-  }
-
-  if (playmode == 1) {
+  if(playmode){
     snare_sample = (pgm_read_byte(&snare_table[(index3)])) - 127;
     kick_sample = (pgm_read_byte(&kick_table[(index4)])) - 127;
     hat_sample = (pgm_read_byte(&tick_table[(index)])) - 127;
@@ -23,7 +13,20 @@ ISR(TIMER2_COMPA_vect) {
     noise_sample = (((pgm_read_byte(&noise_table[(index5)])))) - 127;
 
   }
-  sample_sum = snare_sample + kick_sample + hat_sample + bass_sample + B1_freq_sample + B2_freq_sample;
+  else { //reverse
+    snare_sample = (pgm_read_byte(&snare_table[(snare_length - index3)])) - 127;
+    kick_sample = (pgm_read_byte(&kick_table[(kick_length - index4)])) - 127;
+    hat_sample = (pgm_read_byte(&tick_table[(tick_length - index)])) - 127;
+    bass_sample = (pgm_read_byte(&bass_table[(bass_length - index2)])) - 127;
+
+    B1_freq_sample = pgm_read_byte(&tick_table[(tick_length - index_freq_1)]) - 127;
+    B2_freq_sample = (pgm_read_byte(&bass_table[(bass_length - index_freq_2)])) - 127;
+
+  }
+  // sample_sum = snare_sample + kick_sample + hat_sample + bass_sample + B1_freq_sample + B2_freq_sample;
+  sample_sum = snare_sample;
+  // sample_sum_b = kick_sample + hat_sample + bass_sample + B1_freq_sample + B2_freq_sample;
+  sample_sum_b = kick_sample + hat_sample + bass_sample + B1_freq_sample + B2_freq_sample;
 
   if (noise_mode == 1) {
 
@@ -32,18 +35,22 @@ ISR(TIMER2_COMPA_vect) {
 
     if (B1_latch == 0 && B2_latch == 0  && B3_latch == 0  && B4_latch == 0 ) {
       sample = 127 ;
+      sample_b = 127 ;
     }
     else {
       sample = sample_holder1;
+      sample_b = sample_holder1;
     }
 
   }
 
   if (noise_mode == 0) {
-    sample = ((snare_sample + kick_sample + hat_sample + bass_sample + B1_freq_sample + B2_freq_sample)) + 127;
+    sample = (sample_sum) + 127;
+    sample_b = (sample_sum_b) + 127;
 
   }
   byte sample_out = constrain(sample, 0, 255);
+  byte sample_out_b = constrain(sample_b, 0, 255);
 
 
   uint16_t dac_out = (0 << 15) | (1 << 14) | (1 << 13) | (1 << 12) | ( sample_out << 4 );
@@ -52,8 +59,8 @@ ISR(TIMER2_COMPA_vect) {
   SPI.transfer(dac_out & 255);
   digitalWrite(10, HIGH);
 
-#ifndef MONO
-  uint16_t dac_outb = (1 << 15) | (1 << 14) | (1 << 13) | (1 << 12) | ( sample_out << 4 );
+#ifdef STEREO
+  uint16_t dac_outb = (1 << 15) | (1 << 14) | (1 << 13) | (1 << 12) | ( sample_out_b << 4 );
   digitalWrite(10, LOW);
   SPI.transfer(dac_outb >> 8);
   SPI.transfer(dac_outb & 255);
@@ -61,16 +68,6 @@ ISR(TIMER2_COMPA_vect) {
 #endif
 
   ///////////////////////////////////////////////////////////////////////////////
-
-  if (playmode == 0) {
-    indexr = (index3 - snare_length) * -1;
-    index2r = (index4 - kick_length) * -1;
-    index3r = (index - tick_length) * -1;
-    index4r = (index2 - bass_length) * -1;
-    index2vr = (index_freq_1 - tick_length) * -1;
-    index4vr = (index_freq_2 - bass_length) * -1;
-
-  }
 
   if (B1_latch == 1) {
     if (midicc1 > 4) {

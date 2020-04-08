@@ -10,6 +10,11 @@ All work licensed under a Creative Commons Attribution-ShareAlike 3.0
 Now compatible with current versions of MIDI, bounce and pgmspace.
 It is no longer necessary to edit MIDI.h
 
+-------------
+
+Adapted for Arduino Nano + Platformio by Adrien Fauconnet
+https://github.com/jacobanana/Bleep-Drum
+
 */
 
 
@@ -27,7 +32,10 @@ It is no longer necessary to edit MIDI.h
 #define LED_GREEN 9
 
 
-
+#define MIDI_RED 40
+#define MIDI_BLUE 41
+#define MIDI_GREEN 36
+#define MIDI_YELLOW 37
 
 #include <MIDI.h>
 MIDI_CREATE_DEFAULT_INSTANCE();
@@ -59,80 +67,63 @@ Bounce debouncerYellow = Bounce();
 const char noise_table[] PROGMEM = {};
 
 
-int sample_holder1, sample_holder2;
-byte eee, ee, ef, eef;
+int sample_holder1;
+byte eee, ee;
 byte shift, bankpg, bankpr, bout, rout, gout, prevpot2;
-byte      banko = 0;
-byte n1, n2;
-int n3;
+
 byte bankpb = 4;
-byte beat;
 int pot1 = 127;
 int pot2 = 4;
 long pot3, pot4;
-int kick_sample, snare_sample, sample, hat_sample, noise_sample, bass_sample, B2_freq_sample, B1_freq_sample;
-uint16_t increment, increment2, increment3, increment4, increment5, increment2v, increment4v;
-uint32_t accumulator, accumulator2, accumulator3, accumulator4, accumulator5, accu_freq_1, accu_freq_2;
-int rando;
-//byte B1_sequence[16]={0,1,0,1 ,1,1,0,0 ,0,1,0,1 ,1,1,1,1};
-//byte B4_sequence[16]={1,0,1,0 ,1,0,1,0 ,1,0,1,0 ,1,1,1,1};
+
+// Sequences
+byte banko = 0; // this defines which 32 steps sequence to use. sequences are stored in a 1D array of length 128
+byte B1_sequence[128] = {}; // triggers sequences
 byte B2_sequence[128] = {};
 byte B3_sequence[128] = {};
-byte B1_sequence[128] = {};
 byte B4_sequence[128] = {
-  1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0,
-  1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0,
-  0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0,
-  1, 1, 1, 1 , 1, 1, 1, 1 , 1, 1, 1, 1 , 1, 1, 1, 1 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0,
+  1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0, // banko = 0
+  1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0, // banko = 31
+  0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0, // banko = 63
+  1, 1, 1, 1 , 1, 1, 1, 1 , 1, 1, 1, 1 , 1, 1, 1, 1 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0, // banko = 95
 };
 
-int B2_freq_sequence[128] = {
-  0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0,
-  0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0,
-  0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0,
-  0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0,
-
-};
-int B1_freq_sequence[128] = {};
-int sample_sum;
-int j, k, freq3, cc;
-int kf, pf, holdkf, kfe;
-int shiftcount = 0;
-int t1, c1, count1, dd;
-byte noise_type;
-uint16_t index, index2, index3, index4, index5, index4b, index_freq_1, index_freq_2, index4bv;
-uint16_t indexr, index2r, index3r, index4r, index4br, index2vr, index4vr;
-int osc, oscc;
-byte ledstep;
-byte noise_mode = 1;
-unsigned long freq, freq2;
-
-int wavepot, lfopot, arppot;
+int B1_freq_sequence[128] = {}; // frequency pots sequences
+int B2_freq_sequence[128] = {};
 
 byte loopstep = 0;
 byte loopstepf = 0;
 
-byte recordbutton, prevrecordbutton, record, looptrigger, prevloopstep, revbutton, prevrevbutton, preva, prevb;
-int looprate;
-//int clapbank[16]={1,0,0,0,1,0,1,0,1,1,1,1,0,0,0,0};
-long prev, prev2, prev3;
-byte playmode = 1;
+
+// Sample playback
+byte playmode = 1; // 1 = forward / 0 = reverse
+uint16_t index, index2, index3, index4, index5, index4b, index_freq_1, index_freq_2, index4bv;
+int sample_sum, sample_sum_b;
+int kick_sample, snare_sample, sample, hat_sample, noise_sample, bass_sample, B2_freq_sample, B1_freq_sample, sample_b;
+uint32_t accumulator, accumulator2, accumulator3, accumulator4, accumulator5, accu_freq_1, accu_freq_2;
+
+
+int kf, pf, holdkf, kfe;
+byte noise_mode = 1; // noise mode is activated when pressing shift at boot
+
+byte recordbutton, precordbutton, record, looptrigger, prevloopstep, revbutton, prevrevbutton, preva, prevb, playbutton, pplaybutton;
+
+long prev;
+
 byte play = 0;
-byte playbutton, pplaybutton;
-byte prevbanktrigger, banktrigger;
-byte pkbutton, kbutton, B4_trigger, B4_latch, cbutton, pcbutton, B4_loop_trigger, B1_trigger, kick, B1_latch, clap, B1_loop_trigger, B4_seq_trigger, B3_seq_trigger;
-byte ptbutton, tbutton, ttriger, B1_seq_trigger, B3_latch, B2_trigger, bc, B2_loop_trigger, B3_loop_trigger;
-byte B2_latch, B3_trigger, B2_seq_trigger, pbutton, ppbutton;
-byte kicktriggerv, B2_seq_latch, kickseqtriggerv,  B1_seq_latch, pewseqtriggerv, precordbutton;
-byte measure, half;
 byte recordmode = 1;
-byte tap, tapbutton, ptapbutton, eigth;
-long tapholder, prevtap;
+
+byte B1_trigger, B1_latch, B1_loop_trigger, B1_seq_trigger, B1_seq_latch;
+byte B2_trigger, B2_latch, B2_loop_trigger, B2_seq_trigger, B2_seq_latch;
+byte B3_trigger, B3_latch, B3_loop_trigger, B3_seq_trigger;
+byte B4_trigger, B4_latch, B4_loop_trigger, B4_seq_trigger;
+
+long prevtap;
 unsigned long taptempo = 8000000;
 unsigned long ratepot;
-byte r, g, b, erase, e, preveigth;
-//Bounce bouncertap = Bounce(TAP, 100);
-byte trigger_input, trigger_output,   trigger_out_latch, tl;
+byte r, g, b, erase, e, eigth, preveigth;
+
+byte trigger_input;
 byte onetime = 1;
 //Bounce bouncer1 = Bounce(2, 200); //not actuall 2 seconds since timers are running at 64kHz.
 //Bounce bouncer4 = Bounce(18, 200);
@@ -298,16 +289,9 @@ void loop() {
   debouncerYellow.update();
   
   button1 = debouncerRed.read();
-  // button1 = digitalRead(2);
-  
   button2 = debouncerBlue.read();
-  //button2 = digitalRead(19);
-  
   button3 = debouncerGreen.read();
-  //button3 = digitalRead(17);
-  
   button4 = debouncerYellow.read();
-  //button4 = digitalRead(18);
   
   tapb = digitalRead(TAP);
 
@@ -344,10 +328,8 @@ void loop() {
   }
   if (midi_note_check == 58) {
     miditap2 = 1;
-    //   digitalWrite(5,HIGH);
   }
   else {
-    //      digitalWrite(9,HIGH);
     miditap2 = 0;
   }
   if (midi_note_check == 57) {
@@ -357,21 +339,17 @@ void loop() {
   }
 
   else {
-    //      digitalWrite(9,HIGH);
     midistep = 0;
   }
 
   if (midi_note_check == 67) {
-
     play++;
     play %= 2;
-    //   digitalWrite(5,HIGH);
   }
 
   if (midi_note_check == 69) {
     playmode++;
     playmode %= 2;
-    //   digitalWrite(5,HIGH);
   }
 
 
@@ -1010,7 +988,7 @@ void BUTTONS() {
   if (shift == 1) {
     //       if (bf1==1){
 
-    if (bf1 == 1 || midi_note_check == 60) {
+    if (bf1 == 1 || midi_note_check == MIDI_BLUE) {
       B1_trigger = 1;
     }
     else {
@@ -1018,7 +996,7 @@ void BUTTONS() {
     }
     //    if (bf4==1){
 
-    if (bf4 == 1 || midi_note_check == 65) {
+    if (bf4 == 1 || midi_note_check == MIDI_YELLOW) {
       B4_trigger = 1;
     }
     else {
@@ -1026,14 +1004,14 @@ void BUTTONS() {
     }
     //    if (bf2==1){
 
-    if (bf2 == 1 || midi_note_check == 62) {
+    if (bf2 == 1 || midi_note_check == MIDI_RED) {
       B2_trigger = 1;
     }
     else {
       B2_trigger = 0;
     }
     //   if (bf3==1){
-    if (bf3 == 1 || midi_note_check == 64) {
+    if (bf3 == 1 || midi_note_check == MIDI_GREEN) {
       B3_trigger = 1;
     }
     else {
