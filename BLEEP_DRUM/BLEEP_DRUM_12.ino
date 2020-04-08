@@ -24,14 +24,16 @@ https://github.com/jacobanana/Bleep-Drum
 #define TAP 18
 #define SHIFT 17
 
-#define red_pin 6
-#define blue_pin 2
-#define green_pin 3
-#define yellow_pin 4
+#define RED_PIN 6
+#define BLUE_PIN 2
+#define GREEN_PIN 3
+#define YELLOW_PIN 4
 
-#define LED_GREEN 9
+#define LED_GREEN 9 // TODO: define correct RGB pins when connected
+#define LED_BLUE 9
+#define LED_RED 5
 
-
+// MIDI VALUES
 #define MIDI_RED 40
 #define MIDI_BLUE 41
 #define MIDI_GREEN 36
@@ -40,8 +42,11 @@ https://github.com/jacobanana/Bleep-Drum
 #include <MIDI.h>
 MIDI_CREATE_DEFAULT_INSTANCE();
 
-#include "Arduino.h"
+#include <SPI.h>
+#include <Bounce2.h>
 
+#define BOUNCE_LOCK_OUT
+// activate the alternative debouncing method. This method is a lot more responsive, but does not cancel noise.
 
 #include <avr/pgmspace.h>
 
@@ -54,18 +59,12 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 #else
 #include "samples_bleep.h"
 #endif
-
-#include <SPI.h>
-#include <Bounce2.h>
-#define BOUNCE_LOCK_OUT
+const char noise_table[] PROGMEM = {};
 
 Bounce debouncerRed = Bounce(); 
 Bounce debouncerGreen = Bounce(); 
 Bounce debouncerBlue = Bounce(); 
 Bounce debouncerYellow = Bounce(); 
-
-const char noise_table[] PROGMEM = {};
-
 
 int sample_holder1;
 byte eee, ee;
@@ -106,17 +105,17 @@ uint32_t accumulator, accumulator2, accumulator3, accumulator4, accumulator5, ac
 int kf, pf, holdkf, kfe;
 byte noise_mode = 1; // noise mode is activated when pressing shift at boot
 
-byte recordbutton, precordbutton, record, looptrigger, prevloopstep, revbutton, prevrevbutton, preva, prevb, playbutton, pplaybutton;
 
 long prev;
 
 byte play = 0;
 byte recordmode = 1;
 
-byte B1_trigger, B1_latch, B1_loop_trigger, B1_seq_trigger, B1_seq_latch;
-byte B2_trigger, B2_latch, B2_loop_trigger, B2_seq_trigger, B2_seq_latch;
-byte B3_trigger, B3_latch, B3_loop_trigger, B3_seq_trigger;
-byte B4_trigger, B4_latch, B4_loop_trigger, B4_seq_trigger;
+// Triggers & latches
+byte button1, pbutton1, bf1, B1_trigger, B1_latch, B1_loop_trigger, B1_seq_trigger, B1_seq_latch;
+byte button2, pbutton2, bf2, B2_trigger, B2_latch, B2_loop_trigger, B2_seq_trigger, B2_seq_latch;
+byte button3, pbutton3, bf3, B3_trigger, B3_latch, B3_loop_trigger, B3_seq_trigger;
+byte button4, pbutton4, bf4, B4_trigger, B4_latch, B4_loop_trigger, B4_seq_trigger;
 
 long prevtap;
 unsigned long taptempo = 8000000;
@@ -125,15 +124,20 @@ byte r, g, b, erase, e, eigth, preveigth;
 
 byte trigger_input;
 byte onetime = 1;
-//Bounce bouncer1 = Bounce(2, 200); //not actuall 2 seconds since timers are running at 64kHz.
-//Bounce bouncer4 = Bounce(18, 200);
-//Bounce bouncer2 = Bounce(19, 200);
-//Bounce bouncer3 = Bounce( 17, 200);
-byte button1, button2, button3, button4, tapb;
-byte pbutton1, pbutton2, pbutton3, pbutton4, ptapb;
-byte prev_trigger_in_read, trigger_in_read, tiggertempo, trigger_step, triggerled, ptrigger_step;
 
-byte bf1, bf2, bf3, bf4, bft;
+// Buttons 
+byte recordbutton, precordbutton;
+byte revbutton, prevrevbutton;
+byte playbutton, pplaybutton;
+byte tapbutton, ptapbutton, bft;
+byte preva, prevb;
+
+
+byte record;
+byte looptrigger, prevloopstep;
+
+byte prev_trigger_in_read, trigger_in_read, trigger_step, triggerled, ptrigger_step;
+
 uint16_t midicc3 = 128;
 uint16_t midicc4 = 157;
 uint16_t midicc1, midicc2, midicc5, midicc6, midicc7, midicc8;
@@ -141,122 +145,76 @@ uint16_t midicc1, midicc2, midicc5, midicc6, midicc7, midicc8;
 byte midi_note_check;
 
 byte prevshift, shift_latch;
-byte tick;
-byte t;
+
+// Tap tempo
+byte t, tiggertempo;
 long tapbank[4];
-//int what,pwhat;
+
+// MIDI stuff
 byte  mnote, mvelocity, miditap, pmiditap, miditap2, midistep, pmidistep, miditempo, midinoise;
 
 unsigned long recordoffsettimer, offsetamount, taptempof;
-int potX;
 
 void setup() {
-  //dac.setGain(1);
-
-
-  // analogWrite(9,2); //Blue
-
-
   randomSeed(analogRead(0));
-  // delay(100);
-
-
-  //  delay(200);
-  // MIDI.setHandleControlChange(cc1);
-  //  MIDI.setHandleNoteOn(noteon);
-  //  MIDI.setHandleNoteOff(noteOff);
-
-  cli();
+  cli(); // disable interrupt
   taptempo = 4000000;
 
+  // Output pins
   pinMode (12, OUTPUT); pinMode (13, OUTPUT); pinMode (11, OUTPUT); pinMode (10, OUTPUT);
   pinMode (9, OUTPUT); pinMode (5, OUTPUT);  pinMode (LED_GREEN, OUTPUT);
   pinMode (16, OUTPUT);
 
+  // Input pins
   pinMode (PLAY, INPUT_PULLUP);   
   pinMode (REC, INPUT_PULLUP);    
   pinMode (TAP, INPUT_PULLUP);    
   pinMode (SHIFT, INPUT_PULLUP);  
-  pinMode (12, INPUT);   
 
-  pinMode (green_pin, INPUT_PULLUP);   //low left clap green
-  pinMode (yellow_pin, INPUT_PULLUP);   // low right kick yellow
-  pinMode (blue_pin, INPUT_PULLUP);    //Up Right tom Blue
-  pinMode (red_pin, INPUT_PULLUP);   // Up right pew red
+  pinMode (GREEN_PIN, INPUT_PULLUP);   //low left clap green
+  pinMode (YELLOW_PIN, INPUT_PULLUP);   // low right kick yellow
+  pinMode (BLUE_PIN, INPUT_PULLUP);    //Up Right tom Blue
+  pinMode (RED_PIN, INPUT_PULLUP);   // Up right pew red
 
-  debouncerGreen.attach(green_pin);
+  // Debouncing on note triggers
+  debouncerGreen.attach(GREEN_PIN);
   debouncerGreen.interval(2); // interval in ms
-  debouncerYellow.attach(yellow_pin);
+  debouncerYellow.attach(YELLOW_PIN);
   debouncerYellow.interval(2); // interval in ms  
-  debouncerBlue.attach(blue_pin);
+  debouncerBlue.attach(BLUE_PIN);
   debouncerBlue.interval(2); // interval in ms
-  debouncerRed.attach(red_pin);
+  debouncerRed.attach(RED_PIN);
   debouncerRed.interval(2); // interval in ms
 
   delay(100);
 
-  if (digitalRead(green_pin) == LOW) {
-    analogWrite(LED_GREEN, 64); //green
-    MIDI.begin(3);
-    delay(20000);
+  /* ======= INIT STATE ========= */
 
-  }
-  else if (digitalRead(red_pin) == LOW) {
-    analogWrite(5, 64); //RED
+  // Assign MIDI channels at boot using coloured buttons
+  if (digitalRead(RED_PIN) == LOW) {
+    analogWrite(LED_RED, 64);
     MIDI.begin(1);
-    delay(20000); // we're messing with the timers so this isn't actually 20000 Millis
-
   }
-  else if (digitalRead(blue_pin) == LOW) {
-    analogWrite(9, 64); //Blue
+  else if (digitalRead(BLUE_PIN) == LOW) {
+    analogWrite(LED_BLUE, 64); 
     MIDI.begin(2);
-    delay(20000);
-
   }
-  else if (digitalRead(yellow_pin) == LOW) {
-    analogWrite(5, 48); //yellow
+  else if (digitalRead(GREEN_PIN) == LOW) {
+    analogWrite(LED_GREEN, 64);
+    MIDI.begin(3);
+  }
+  else if (digitalRead(YELLOW_PIN) == LOW) {
+    analogWrite(LED_RED, 48);
     analogWrite(LED_GREEN, 16);
-
     MIDI.begin(4);
-    delay(20000);
-
   }
-
   else {
     MIDI.begin(0);
   }
-
+  delay(20000); // we're messing with the timers so this isn't actually 20000 Millis
   MIDI.turnThruOff();
-  
-  //pinMode (16, INPUT); digitalWrite (16, HIGH);
-  digitalWrite(16, HIGH);
-  SPI.begin();
-  SPI.setBitOrder(MSBFIRST);
-  /* Enable interrupt on timer2 == 127, with clk/8 prescaler. At 16MHz,
-     this gives a timer interrupt at 15625Hz. */
-  TIMSK2 = (1 << OCIE2A);
-  OCR2A = 128;
-  //OCR2B = 127;
 
-  /* clear/reset timer on match */
-  TCCR2A = 1 << WGM21 | 0 << WGM20; /* CTC mode, reset on match */
-  TCCR2B = 0 << CS22 | 1 << CS21 | 1 << CS20; /* clk, /8 prescaler */
-
-  //dac
-  //   SPCR = 0x50;
-  //   SPSR = 0x01;
-  //   DDRB |= 0x2E;
-  ///   PORTB |= (1<<1);
-
-  //pwm
-  TCCR0B = B0000001;
-  TCCR1B = B0000001;
-
-  //    TCCR0B = TCCR0B & 0b11111000 | 0x03;
-  //   TCCR1B = TCCR1B & 0b11111000 | 0x03;
-
-
-  sei();
+  // Enable Noise mode at boot
   if (digitalRead(SHIFT) == 0) {
     noise_mode = 1;
   }
@@ -264,6 +222,24 @@ void setup() {
     noise_mode = 0;
   }
 
+
+  // SPI initialisation for DAC
+  SPI.begin();
+  SPI.setBitOrder(MSBFIRST);
+  /* Enable interrupt on timer2 == 127, with clk/8 prescaler. At 16MHz,
+     this gives a timer interrupt at 15625Hz. */
+  TIMSK2 = (1 << OCIE2A);
+  OCR2A = 128;
+
+  /* clear/reset timer on match */
+  TCCR2A = 1 << WGM21 | 0 << WGM20; /* CTC mode, reset on match */
+  TCCR2B = 0 << CS22 | 1 << CS21 | 1 << CS20; /* clk, /8 prescaler */
+
+  //pwm
+  TCCR0B = B0000001;
+  TCCR1B = B0000001;
+
+  sei(); // enable interrupt
 
 }
 
@@ -293,7 +269,7 @@ void loop() {
   button3 = debouncerGreen.read();
   button4 = debouncerYellow.read();
   
-  tapb = digitalRead(TAP);
+  tapbutton = digitalRead(TAP);
 
   if (button1 == 0 && pbutton1 == 1) {
     bf1 = 1;
@@ -320,7 +296,7 @@ void loop() {
   else {
     bf4 = 0;
   }
-  if (tapb == 0 && ptapb == 1) {
+  if (tapbutton == 0 && ptapbutton == 1) {
     bft = 1;
   }
   else {
@@ -376,7 +352,7 @@ void loop() {
 
 
 
-  ptapb = tapb;
+  ptapbutton = tapbutton;
   pmiditap = miditap;
   pmidistep = midistep;
 
@@ -765,11 +741,11 @@ void RECORD() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void LEDS() {
-  //  analogWrite(9,0);
-  //       analogWrite(5,0);
-  analogWrite(9, bout >> 1); //Blue
+  //  analogWrite(LED_BLUE,0);
+  //       analogWrite(LED_RED,0);
+  analogWrite(LED_BLUE, bout >> 1); //Blue
   analogWrite(LED_GREEN, (gout >> 1) + triggerled); //green
-  analogWrite(5, rout >> 1);
+  analogWrite(LED_RED, rout >> 1);
 
   if (noise_mode == 1) {
     rout = r;
@@ -946,7 +922,7 @@ void BUTTONS() {
     }
 
 
-    if (tapb == LOW) {
+    if (tapbutton == LOW) {
       play = 1;
       ratepot = (analogRead(14));
       taptempo = ratepot << 14;
