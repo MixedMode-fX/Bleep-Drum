@@ -3,34 +3,34 @@ ISR(TIMER2_COMPA_vect) {
 
 
   if(playmode){
-    snare_sample = (pgm_read_byte(&snare_table[(index3)])) - 127;
-    kick_sample = (pgm_read_byte(&kick_table[(index4)])) - 127;
-    hat_sample = (pgm_read_byte(&tick_table[(index)])) - 127;
-    bass_sample = (((pgm_read_byte(&bass_table[(index2)])))) - 127;
-    B1_freq_sample = pgm_read_byte(&tick_table[(index_freq_1)]) - 127;
-    B2_freq_sample = (pgm_read_byte(&bass_table[(index_freq_2)])) - 127;
+    sample3 = (pgm_read_byte(&snare_table[(index3)])) - 127;
+    sample4 = (pgm_read_byte(&kick_table[(index4)])) - 127;
+    sample2 = (pgm_read_byte(&tick_table[(index2)])) - 127;
+    sample1 = (((pgm_read_byte(&bass_table[(index1)])))) - 127;
+    sample_freq_1 = pgm_read_byte(&tick_table[(index_freq_1)]) - 127;
+    sample_freq_2 = (pgm_read_byte(&bass_table[(index_freq_2)])) - 127;
 
-    noise_sample = (((pgm_read_byte(&noise_table[(index5)])))) - 127;
+    noise_sample = (((pgm_read_byte(&noise_table[(index_noise)])))) - 127;
 
   }
   else { //reverse
-    snare_sample = (pgm_read_byte(&snare_table[(snare_length - index3)])) - 127;
-    kick_sample = (pgm_read_byte(&kick_table[(kick_length - index4)])) - 127;
-    hat_sample = (pgm_read_byte(&tick_table[(tick_length - index)])) - 127;
-    bass_sample = (pgm_read_byte(&bass_table[(bass_length - index2)])) - 127;
+    sample3 = (pgm_read_byte(&snare_table[(snare_length - index3)])) - 127;
+    sample4 = (pgm_read_byte(&kick_table[(kick_length - index4)])) - 127;
+    sample2 = (pgm_read_byte(&tick_table[(tick_length - index2)])) - 127;
+    sample1 = (pgm_read_byte(&bass_table[(bass_length - index1)])) - 127;
 
-    B1_freq_sample = pgm_read_byte(&tick_table[(tick_length - index_freq_1)]) - 127;
-    B2_freq_sample = (pgm_read_byte(&bass_table[(bass_length - index_freq_2)])) - 127;
+    sample_freq_1 = pgm_read_byte(&tick_table[(tick_length - index_freq_1)]) - 127;
+    sample_freq_2 = (pgm_read_byte(&bass_table[(bass_length - index_freq_2)])) - 127;
 
   }
-  // sample_sum = snare_sample + kick_sample + hat_sample + bass_sample + B1_freq_sample + B2_freq_sample;
-  sample_sum = snare_sample;
-  // sample_sum_b = kick_sample + hat_sample + bass_sample + B1_freq_sample + B2_freq_sample;
-  sample_sum_b = kick_sample + hat_sample + bass_sample + B1_freq_sample + B2_freq_sample;
+
+  // TODO: left right assignement at boot or with midi
+  sample_sum = sample3;
+  sample_sum_b = sample4 + sample2 + sample1 + sample_freq_1 + sample_freq_2;
 
   if (noise_mode == 1) {
 
-    sample_holder1 = (sample_sum ^ (noise_sample >> 1)) + 127;
+    sample_holder1 = ((sample_sum_b + sample_sum) ^ (noise_sample >> 1)) + 127;
 
 
     if (B1_latch == 0 && B2_latch == 0  && B3_latch == 0  && B4_latch == 0 ) {
@@ -49,6 +49,7 @@ ISR(TIMER2_COMPA_vect) {
     sample_b = (sample_sum_b) + 127;
 
   }
+
   byte sample_out = constrain(sample, 0, 255);
   byte sample_out_b = constrain(sample_b, 0, 255);
 
@@ -71,16 +72,16 @@ ISR(TIMER2_COMPA_vect) {
 
   if (B1_latch == 1) {
     if (midicc1 > 4) {
-      accumulator += midicc1;
+      accumulator1 += midicc1;
     }
     else {
-      accumulator += pot1;
+      accumulator1 += pot1;
     }
-    index = (accumulator >> (6));
-    if (index > tick_length) {
+    index2 = (accumulator1 >> (6));
+    if (index2 > tick_length) {
 
-      index = 0;
-      accumulator = 0;
+      index2 = 0;
+      accumulator1 = 0;
       B1_latch = 0;
     }
   }
@@ -92,10 +93,10 @@ ISR(TIMER2_COMPA_vect) {
     else {
       accumulator2 += pot2;
     }
-    index2 = (accumulator2 >> (6));
-    if (index2 > bass_length) {
+    index1 = (accumulator2 >> (6));
+    if (index1 > bass_length) {
 
-      index2 = 0;
+      index1 = 0;
       accumulator2 = 0;
       B2_latch = 0;
     }
@@ -163,12 +164,12 @@ ISR(TIMER2_COMPA_vect) {
 
 
   if (noise_mode == 1) {
-    accumulator5 += (pot3);
+    accumulator_noise += (pot3);
     // index4b=(accumulator4 >> (6));
-    index5 = (accumulator5 >> (6));
-    if (index5 > pot4) {
-      index5 = 0;
-      accumulator5 = 0;
+    index_noise = (accumulator_noise >> (6));
+    if (index_noise > pot4) {
+      index_noise = 0;
+      accumulator_noise = 0;
     }
   }
 }

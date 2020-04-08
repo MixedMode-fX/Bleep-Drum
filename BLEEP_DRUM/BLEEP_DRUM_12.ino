@@ -69,7 +69,6 @@ Bounce debouncerYellow = Bounce();
 int sample_holder1;
 byte eee, ee;
 byte shift, bankpg, bankpr, bout, rout, gout, prevpot2;
-
 byte bankpb = 4;
 int pot1 = 127;
 int pot2 = 4;
@@ -96,20 +95,24 @@ byte loopstepf = 0;
 
 // Sample playback
 byte playmode = 1; // 1 = forward / 0 = reverse
-uint16_t index, index2, index3, index4, index5, index4b, index_freq_1, index_freq_2, index4bv;
 int sample_sum, sample_sum_b;
-int kick_sample, snare_sample, sample, hat_sample, noise_sample, bass_sample, B2_freq_sample, B1_freq_sample, sample_b;
-uint32_t accumulator, accumulator2, accumulator3, accumulator4, accumulator5, accu_freq_1, accu_freq_2;
 
+int sample1, sample2, sample3, sample4, sample_freq_1, sample_freq_2;
+int sample, sample_b; 
+
+uint16_t index1, index2, index3, index4, index_freq_1, index_freq_2, index_noise;
+uint32_t accumulator1, accumulator2, accumulator3, accumulator4, accu_freq_1, accu_freq_2, accumulator_noise;
+
+// Noise mode 
+int noise_sample;
 
 int kf, pf, holdkf, kfe;
-byte noise_mode = 1; // noise mode is activated when pressing shift at boot
-
-
 long prev;
 
+// Modes
 byte play = 0;
 byte recordmode = 1;
+byte noise_mode = 1; // noise mode is activated when pressing shift at boot
 
 // Triggers & latches
 byte button1, pbutton1, bf1, B1_trigger, B1_latch, B1_loop_trigger, B1_seq_trigger, B1_seq_latch;
@@ -577,8 +580,8 @@ void loop() {
     B4_latch = 1;
   }
   if (B1_trigger == 1) {
-    index = 0;
-    accumulator = 0;
+    index1 = 0;
+    accumulator1 = 0;
     B1_latch = 1;
   }
 
