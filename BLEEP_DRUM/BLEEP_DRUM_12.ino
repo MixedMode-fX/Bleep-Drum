@@ -50,6 +50,8 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 
 #include <avr/pgmspace.h>
 
+#include "sample.h"
+
 #ifdef DAM
 #include "samples_dam.h"
 #elif DAM2
@@ -95,13 +97,25 @@ byte loopstepf = 0;
 
 // Sample playback
 byte playmode = 1; // 1 = forward / 0 = reverse
-int sample_sum, sample_sum_b;
+
+// samples
+#define N_SAMPLES 4
+Sample samples[N_SAMPLES] = {
+  Sample(*table0, length0),
+  Sample(*table1, length1),
+  Sample(*table2, length2),
+  Sample(*table3, length3),
+};
+
 
 int sample1, sample2, sample3, sample4, sample_freq_1, sample_freq_2;
+uint16_t index2, index3, index4, index_freq_1, index_freq_2, index_noise;
+uint32_t accumulator1, accumulator2, accumulator3, accumulator4, accu_freq_1, accu_freq_2, accumulator_noise;
+
+// Sample sums
+int sample_sum, sample_sum_b;
 int sample, sample_b; 
 
-uint16_t index1, index2, index3, index4, index_freq_1, index_freq_2, index_noise;
-uint32_t accumulator1, accumulator2, accumulator3, accumulator4, accu_freq_1, accu_freq_2, accumulator_noise;
 
 // Noise mode 
 int noise_sample;
@@ -159,6 +173,8 @@ byte  mnote, mvelocity, miditap, pmiditap, miditap2, midistep, pmidistep, midite
 unsigned long recordoffsettimer, offsetamount, taptempof;
 
 void setup() {
+  Serial.begin(9600);
+
   randomSeed(analogRead(0));
   cli(); // disable interrupt
   taptempo = 4000000;
@@ -280,6 +296,7 @@ void loop() {
   else {
     bf1 = 0;
   }
+
   if (button2 == 0 && pbutton2 == 1) {
     bf2 = 1;
   }
@@ -567,40 +584,53 @@ void loop() {
   }
 
 
-
-  if (B3_trigger == 1 || B3_seq_trigger == 1) {
-    index3 = 0;
-    accumulator3 = 0;
-    B3_latch = 1;
-  }
-
-  if (B4_trigger == 1 || B4_seq_trigger == 1) {
-    index4 = 0;
-    accumulator4 = 0;
-    B4_latch = 1;
-  }
   if (B1_trigger == 1) {
-    index1 = 0;
-    accumulator1 = 0;
-    B1_latch = 1;
-  }
-
-  if (B1_seq_trigger == 1) {
-    index_freq_1 = 0;
-    accu_freq_1 = 0;
-    B1_seq_latch = 1;
-  }
-  if (B2_seq_trigger == 1) {
-    index_freq_2 = 0;
-    accu_freq_2 = 0;
-    B2_seq_latch = 1;
+    samples[0].trigger();
   }
 
   if (B2_trigger == 1) {
-    index2 = 0;
-    accumulator2 = 0;
-    B2_latch = 1;
+    samples[1].trigger();
   }
+  
+  if (B3_trigger == 1) {
+    samples[2].trigger();
+  }
+  
+  if (B4_trigger == 1) {
+    samples[3].trigger();
+  }
+  
+  // TODO: add sequencer triggers 
+
+
+  // if (B3_trigger == 1 || B3_seq_trigger == 1) {
+  //   index3 = 0;
+  //   accumulator3 = 0;
+  //   B3_latch = 1;
+  // }
+
+  // if (B4_trigger == 1 || B4_seq_trigger == 1) {
+  //   index4 = 0;
+  //   accumulator4 = 0;
+  //   B4_latch = 1;
+  // }
+
+  // if (B1_seq_trigger == 1) {
+  //   index_freq_1 = 0;
+  //   accu_freq_1 = 0;
+  //   B1_seq_latch = 1;
+  // }
+  // if (B2_seq_trigger == 1) {
+  //   index_freq_2 = 0;
+  //   accu_freq_2 = 0;
+  //   B2_seq_latch = 1;
+  // }
+
+  // if (B2_trigger == 1) {
+  //   index2 = 0;
+  //   accumulator2 = 0;
+  //   B2_latch = 1;
+  // }
 
 
 
