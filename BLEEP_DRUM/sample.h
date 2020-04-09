@@ -46,7 +46,6 @@ class Sample{
                     index = 0;
                     accumulator = 0;
                     latch_status = 0;
-                    Serial.print("END");
                 }
             }
         }
