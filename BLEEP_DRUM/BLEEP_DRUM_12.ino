@@ -19,7 +19,7 @@ It is no longer necessary to edit MIDI.h
 #define TAP 18
 #define SHIFT 17
 
-#define red_pin 6
+#define red_pin 7
 #define blue_pin 2
 #define green_pin 3
 #define yellow_pin 4
