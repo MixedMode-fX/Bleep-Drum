@@ -275,15 +275,11 @@ void loop() {
   debouncerBlue.update();
   debouncerGreen.update();
   debouncerYellow.update();
-  
-  tapbutton = digitalRead(TAP);
 
-  if (tapbutton == 0 && ptapbutton == 1) {
-    bft = 1;
-  }
-  else {
-    bft = 0;
-  }
+  // tap tempo  
+  tapbutton = digitalRead(TAP);
+  bft = tapbutton == 0 && ptapbutton == 1;
+  ptapbutton = tapbutton;
 
   HANDLE_MIDI();
   LEDS();
@@ -439,8 +435,7 @@ void loop() {
       prevtap = micros();
 
     }
-    else {
-    }
+
   }
 
 
@@ -586,9 +581,6 @@ void LEDS() {
     }
   }
 
-  else {
-  }
-
   preveigth = eigth;
 
   if (erase == 1) {
@@ -681,7 +673,7 @@ void LEDS() {
       b = 0;
     }
 
-    else if ( loopstep == 4 || loopstep == 8 || loopstep == 12   || loopstep == 20 || loopstep == 24 || loopstep == 28) {
+    else if (loopstep % 4 == 0) {
       r = 48;
       g = 0;
       b = 0;
@@ -716,7 +708,6 @@ void BUTTONS() {
   if (shift == 0 && recordbutton == 1) {
     if (debouncerRed.read() == 0 ) { //red
       banko = 63;
-
     }
     if (debouncerYellow.read() == 0) { //yellow
       banko = 31;
@@ -944,7 +935,6 @@ void HANDLE_MIDI(){
     banko = 95; //green
   }
 
-  ptapbutton = tapbutton;
   pmiditap = miditap;
   pmidistep = midistep;
 }
