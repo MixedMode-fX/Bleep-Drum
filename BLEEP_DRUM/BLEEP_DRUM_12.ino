@@ -145,11 +145,10 @@ byte recordbutton, precordbutton;
 byte revbutton, prevrevbutton;
 byte playbutton, pplaybutton;
 byte tapbutton, ptapbutton, bft;
-byte preva, prevb;
-
-
+byte prevshift, shift_latch;
 byte record;
-byte looptrigger, prevloopstep;
+
+byte prevloopstep;
 
 // Trigger input
 byte onetime = 1;
@@ -157,7 +156,7 @@ byte trigger_step, triggerled, ptrigger_step;
 
 byte midi_note_check;
 
-byte prevshift, shift_latch;
+
 
 // Tap tempo
 byte t, tiggertempo;
@@ -316,7 +315,6 @@ void loop() {
     }
     else {
       prevloopstep = loopstep;
-      preva = eigth;
 
       if (recordmode == 1 && miditempo == 0 && tiggertempo == 0) {
         if (micros() - prev > (taptempof) ) {
