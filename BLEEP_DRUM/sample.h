@@ -10,13 +10,14 @@ class Sample{
         };
 
         uint16_t getIndex(){ return index; }    
+        
         byte getSample(){ 
             return pgm_read_byte(&table[index]) - 127; 
         }
         byte getReverseSample(){
-            // same applies here /!?
             return pgm_read_byte(&table[(length - index)]) - 127;
         }
+
         uint16_t getSampleLength(){ return length; }
         void setAccumulator(uint16_t a){ 
             if(a != 0) accumulator += a; 
@@ -60,9 +61,7 @@ class Sample{
         uint16_t length;
         uint16_t index;
         uint32_t accumulator;
-        
         uint8_t latch_status;
-
         uint16_t speed = 128;
 };
 

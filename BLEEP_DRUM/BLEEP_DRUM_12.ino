@@ -112,20 +112,14 @@ Sample samples[N_SAMPLES] = {
   Sample(*table1, length1),
 };
 
-
-int sample1, sample2, sample3, sample4, sample_freq_1, sample_freq_2;
-uint16_t index2, index3, index4, index_freq_1, index_freq_2, index_noise;
-uint32_t accumulator1, accumulator2, accumulator3, accumulator4, accu_freq_1, accu_freq_2, accumulator_noise;
-
-// Sample sums
+// Sample MIXER
 int sample_sum, sample_sum_b;
 int sample, sample_b; 
 
 
 // Noise mode 
-int noise_sample;
+int noise_sample, index_noise, accumulator_noise;
 
-int kf, pf, holdkf, kfe;
 long prev;
 
 // Modes
@@ -160,9 +154,9 @@ byte looptrigger, prevloopstep;
 
 byte prev_trigger_in_read, trigger_in_read, trigger_step, triggerled, ptrigger_step;
 
-uint16_t midicc3 = 128;
-uint16_t midicc4 = 157;
-uint16_t midicc1, midicc2, midicc5, midicc6, midicc7, midicc8;
+// uint16_t midicc3 = 128;
+// uint16_t midicc4 = 157;
+// uint16_t midicc1, midicc2, midicc5, midicc6, midicc7, midicc8;
 
 byte midi_note_check;
 
@@ -413,50 +407,50 @@ void loop() {
     }
   }
 
-  // trigger_in_read = digitalRead(16);
+  trigger_in_read = digitalRead(16);
 
-  // if (trigger_in_read == 1 && prev_trigger_in_read == 0) {
-  //   trigger_input = 1;
-  // }
-  // else {
-  //   trigger_input = 0;
+  if (trigger_in_read == 1 && prev_trigger_in_read == 0) {
+    trigger_input = 1;
+  }
+  else {
+    trigger_input = 0;
 
-  // }
-  // prev_trigger_in_read = trigger_in_read;
+  }
+  prev_trigger_in_read = trigger_in_read;
 
-  // eigth = loopstep % 4;
+  eigth = loopstep % 4;
 
-  // if (tiggertempo == 0) {
+  if (tiggertempo == 0) {
 
-  //   if (eigth == 0) {
-  //     digitalWrite(12, HIGH);
-  //     // tl++;
-  //   }
-  //   else {
-  //     digitalWrite(12, LOW);
-  //   }
+    if (eigth == 0) {
+      digitalWrite(12, HIGH);
+      // tl++;
+    }
+    else {
+      digitalWrite(12, LOW);
+    }
 
-  // }
+  }
 
-  // //////////////////////////////////////////// intput trigger
+  //////////////////////////////////////////// intput trigger
 
 
 
-  // prev_trigger_in_read = trigger_in_read;
+  prev_trigger_in_read = trigger_in_read;
 
-  // trigger_in_read = digitalRead(12);
+  trigger_in_read = digitalRead(12);
 
-  // if (trigger_in_read == 0 && prev_trigger_in_read == 1) {
-  //   tiggertempo = 1;
-  //   trigger_step = 1;
-  //   //digitalWrite(LED_GREEN,HIGH);
+  if (trigger_in_read == 0 && prev_trigger_in_read == 1) {
+    tiggertempo = 1;
+    trigger_step = 1;
+    //digitalWrite(LED_GREEN,HIGH);
 
-  // }
+  }
 
-  // else {
-  //   trigger_step = 0;
-  //   //digitalWrite(LED_GREEN,LOW);
-  // }
+  else {
+    trigger_step = 0;
+    //digitalWrite(LED_GREEN,LOW);
+  }
 
 
 
@@ -590,18 +584,10 @@ void loop() {
     samples[0].trigger();
   }
 
-  if (B1_seq_trigger == 1){
-    samples[4].trigger();
-  }
-
   if (B2_trigger == 1) {
     samples[1].trigger();
   }
   
-  if (B1_seq_trigger == 1){
-    samples[5].trigger();
-  }
-
   if (B3_trigger == 1 || B3_seq_trigger == 1) {
     samples[2].trigger();
   }
@@ -610,43 +596,12 @@ void loop() {
     samples[3].trigger();
   }
   
-  // TODO: add sequencer triggers 
-
-
-  // if (B3_trigger == 1 || B3_seq_trigger == 1) {
-  //   index3 = 0;
-  //   accumulator3 = 0;
-  //   B3_latch = 1;
-  // }
-
-  // if (B4_trigger == 1 || B4_seq_trigger == 1) {
-  //   index4 = 0;
-  //   accumulator4 = 0;
-  //   B4_latch = 1;
-  // }
-
   if (B1_seq_trigger == 1) {
     samples[4].trigger();
-    // index_freq_1 = 0;
-    // accu_freq_1 = 0;
-    // B1_seq_latch = 1;
   }
   if (B2_seq_trigger == 1) {
     samples[5].trigger();
-    // index_freq_2 = 0;
-    // accu_freq_2 = 0;
-    // B2_seq_latch = 1;
   }
-
-  // if (B2_trigger == 1) {
-  //   index2 = 0;
-  //   accumulator2 = 0;
-  //   B2_latch = 1;
-  // }
-
-
-
-
 
   //////////////////////////////////////////////////////////////// T A P
 
@@ -1028,7 +983,7 @@ void BUTTONS() {
     else {
       B2_trigger = 0;
     }
-    //   if (bf3==1){
+
     if (bf3 == 1 || midi_note_check == MIDI_GREEN) {
       B3_trigger = 1;
     }
@@ -1065,37 +1020,20 @@ int midi_note_on() {
 
       case 0xB0: //control change
         if (MIDI.getData1() == 70) {
-          midicc1 = (MIDI.getData2() << 2) + 3;
+          samples[0].setSpeed((MIDI.getData2() << 2) + 3);
         }
 
         if (MIDI.getData1() == 71) {
-          midicc2 = (MIDI.getData2() << 2) + 3;
+          samples[1].setSpeed((MIDI.getData2() << 2) + 3);
         }
 
         if (MIDI.getData1() == 72) {
-          midicc3 = (MIDI.getData2() << 2);
+          samples[2].setSpeed((MIDI.getData2() << 2));
         }
 
         if (MIDI.getData1() == 73) {
-          midicc4 = (MIDI.getData2() << 2);
+          samples[3].setSpeed(MIDI.getData2() << 2);
         }
-      /*
-                       if (MIDI.getData1()==74){
-              midicc5 = (MIDI.getData2());
-             }
-
-                       if (MIDI.getData1()==75){
-              midicc6 = (MIDI.getData2());
-             }
-
-                       if (MIDI.getData1()==76){
-              midicc7 = (MIDI.getData2());
-             }
-
-                       if (MIDI.getData1()==77){
-              midicc8 = (MIDI.getData2());
-             }
-         */
 
 
       default:

@@ -29,7 +29,7 @@ ISR(TIMER2_COMPA_vect) {
       };
       // sample_sum += samples[i].getSample();
     }
-    // noise_sample = (((pgm_read_byte(&noise_table[(index_noise)])))) - 127;
+    if (noise_mode == 1) sample_sum += (((pgm_read_byte(&noise_table[(index_noise)])))) - 127;
   }
   else { //reverse
 
@@ -63,30 +63,31 @@ ISR(TIMER2_COMPA_vect) {
     // original had no noise in reverse ??
   }
 
-  // TODO: left right assignement at boot or with mi
+  // TODO: left right assignement at boot or with midi
   sample_sum_b = sample_sum;
 
-  // if (noise_mode == 1) {
+  if (noise_mode == 1) {
+    sample_holder1 = ((sample_sum) ^ (noise_sample >> 1)) + 127;
 
-  //   sample_holder1 = ((sample_sum_b + sample_sum) ^ (noise_sample >> 1)) + 127;
+    uint8_t latch = 0;
+    for (uint8_t i=0; i<4; i++){
+      latch += samples[i].latched();
+    }
 
+    if (latch == 0) {
+      sample = 127 ;
+      sample_b = 127 ;
+    }
+    else {
+      sample = sample_holder1;
+      sample_b = sample_holder1;
+    }
+  }
 
-  //   if (B1_latch == 0 && B2_latch == 0  && B3_latch == 0  && B4_latch == 0 ) {
-  //     sample = 127 ;
-  //     sample_b = 127 ;
-  //   }
-  //   else {
-  //     sample = sample_holder1;
-  //     sample_b = sample_holder1;
-  //   }
-
-  // }
-
-  // if (noise_mode == 0) {
+  else {
     sample = (sample_sum) + 127;
     sample_b = (sample_sum_b) + 127;
-
-  // }
+  }
 
   byte sample_out = constrain(sample, 0, 255);
   byte sample_out_b = constrain(sample_b, 0, 255);
@@ -167,14 +168,14 @@ ISR(TIMER2_COMPA_vect) {
 
 
   // Noise mode
-  // if (noise_mode == 1) {
-  //   accumulator_noise += (pot3);
-  //   index_noise = (accumulator_noise >> (6));
-  //   if (index_noise > pot4) {
-  //     index_noise = 0;
-  //     accumulator_noise = 0;
-  //   }
-  // }
+  if (noise_mode == 1) {
+    accumulator_noise += samples[2].getSpeed();
+    index_noise = (accumulator_noise >> (6));
+    if (index_noise > pot4) {
+      index_noise = 0;
+      accumulator_noise = 0;
+    }
+  }
 }
 
 
