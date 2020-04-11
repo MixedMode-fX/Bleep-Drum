@@ -128,11 +128,11 @@ byte play = 0;
 byte recordmode = 1;
 byte noise_mode = 1; // noise mode is activated when pressing shift at boot
 
-// Triggers & latches
-byte button1, B1_trigger, B1_loop_trigger, B1_seq_trigger;
-byte button2, B2_trigger, B2_loop_trigger, B2_seq_trigger;
-byte button3, B3_trigger, B3_loop_trigger, B3_seq_trigger;
-byte button4, B4_trigger, B4_loop_trigger, B4_seq_trigger;
+// Triggers
+byte B1_trigger, B1_loop_trigger;
+byte B2_trigger, B2_loop_trigger;
+byte B3_trigger, B3_loop_trigger;
+byte B4_trigger, B4_loop_trigger;
 
 long prev; // Previous time
 long prevtap;
@@ -277,12 +277,14 @@ void loop() {
   debouncerGreen.update();
   debouncerYellow.update();
   
-  button1 = debouncerRed.read();
-  button2 = debouncerBlue.read();
-  button3 = debouncerGreen.read();
-  button4 = debouncerYellow.read();
-  
   tapbutton = digitalRead(TAP);
+
+  if (tapbutton == 0 && ptapbutton == 1) {
+    bft = 1;
+  }
+  else {
+    bft = 0;
+  }
 
   HANDLE_MIDI();
   LEDS();
@@ -364,55 +366,21 @@ void loop() {
 
     }
 
-    B4_loop_trigger = B4_sequence[loopstep + banko];
     B1_loop_trigger = B1_sequence[loopstep + banko];
     B2_loop_trigger = B2_sequence[loopstep + banko];
     B3_loop_trigger = B3_sequence[loopstep + banko];
+    B4_loop_trigger = B4_sequence[loopstep + banko];
+
   }
 
   if (play == 0) {
     loopstep = 31;
     prev = 0;
-    B4_loop_trigger = 0;
     B1_loop_trigger = 0;
     B2_loop_trigger = 0;
     B3_loop_trigger = 0;
+    B4_loop_trigger = 0;
 
-  }
-
-  if (loopstep != prevloopstep && B3_loop_trigger == 1) {
-
-    B3_seq_trigger = 1;
-    //freq3=kickfreqsequence[loopstepf];
-  }
-  else {
-    B3_seq_trigger = 0;
-  }
-
-  if (loopstep != prevloopstep && B2_loop_trigger == 1) {
-
-    B2_seq_trigger = 1;
-    //freq3=kickfreqsequence[loopstepf];
-  }
-  else {
-    B2_seq_trigger = 0;
-  }
-
-  if (loopstep != prevloopstep && B4_loop_trigger == 1) {
-
-    B4_seq_trigger = 1;
-    //freq3=kickfreqsequence[loopstepf];
-  }
-  else {
-    B4_seq_trigger = 0;
-  }
-
-  if (loopstep != prevloopstep && B1_loop_trigger == 1) {
-
-    B1_seq_trigger = 1;
-  }
-  else {
-    B1_seq_trigger = 0;
   }
 
 
@@ -420,25 +388,43 @@ void loop() {
     samples[0].trigger();
   }
 
+  if (loopstep != prevloopstep && B1_loop_trigger == 1) {
+    samples[4].trigger();
+
+    if (tiggertempo == 0) {
+      samples[4].setSpeed(B1_freq_sequence[loopstepf + banko]);
+    }
+    else{
+      samples[4].setSpeed(B1_freq_sequence[loopstep + banko]);
+    }
+
+  }
+
+
   if (B2_trigger == 1) {
     samples[1].trigger();
   }
   
-  if (B3_trigger == 1 || B3_seq_trigger == 1) {
+  if (loopstep != prevloopstep && B2_loop_trigger == 1) {
+    samples[5].trigger();
+
+    if (tiggertempo == 0) {
+      samples[5].setSpeed(B2_freq_sequence[loopstepf + banko]);
+    }
+    else{
+      samples[5].setSpeed(B2_freq_sequence[loopstep + banko]);
+    }
+
+  }
+
+  if (B3_trigger == 1 || (loopstep != prevloopstep && B3_loop_trigger == 1)) {
     samples[2].trigger();
   }
   
-  if (B4_trigger == 1 || B4_seq_trigger == 1) {
+  if (B4_trigger == 1 || (loopstep != prevloopstep && B4_loop_trigger == 1)) {
     samples[3].trigger();
   }
   
-  if (B1_seq_trigger == 1) {
-    samples[4].trigger();
-  }
-  if (B2_seq_trigger == 1) {
-    samples[5].trigger();
-  }
-
   //////////////////////////////////////////////////////////////// T A P
 
 
@@ -730,23 +716,23 @@ void BUTTONS() {
   ///////////////////////////////////////////////////sequence select
 
   if (shift == 0 && recordbutton == 1) {
-    if (button1 == 0 ) { //red
+    if (debouncerRed.read() == 0 ) { //red
       banko = 63;
 
     }
-    if (button4 == 0) { //yellow
+    if (debouncerYellow.read() == 0) { //yellow
       banko = 31;
       bankpr = 4;
       bankpg = 4;
       bankpb = 0;
     }
-    if (button2 == 0 || banko == 0) { //blue
+    if (debouncerBlue.read() == 0 || banko == 0) { //blue
       banko = 0;
       bankpr = 0;
       bankpg = 0;
       bankpb = 8;
     }
-    if (button3 == 0) { //green
+    if (debouncerGreen.read() == 0) { //green
       banko = 95;
       bankpr = 0;
       bankpg = 3;
@@ -796,21 +782,14 @@ void BUTTONS() {
 
   if (shift == 1) {
 
-    if (debouncerBlue.fell() == 1 || midi_note_check == MIDI_BLUE) {
+    if (debouncerRed.fell() == 1 || midi_note_check == MIDI_RED) {
       B1_trigger = 1;
     }
     else {
       B1_trigger = 0;
     }
 
-    if (debouncerYellow.fell() == 1 || midi_note_check == MIDI_YELLOW) {
-      B4_trigger = 1;
-    }
-    else {
-      B4_trigger = 0;
-    }
-
-    if (debouncerRed.fell() == 1 || midi_note_check == MIDI_RED) {
+    if (debouncerBlue.fell() == 1 || midi_note_check == MIDI_BLUE) {
       B2_trigger = 1;
     }
     else {
@@ -824,9 +803,15 @@ void BUTTONS() {
       B3_trigger = 0;
     }
 
+    if (debouncerYellow.fell() == 1 || midi_note_check == MIDI_YELLOW) {
+      B4_trigger = 1;
+    }
+    else {
+      B4_trigger = 0;
+    }
+
+
   }
-
-
 
   ////////////////////////////////////////////
 

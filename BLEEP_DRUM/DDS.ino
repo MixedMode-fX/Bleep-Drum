@@ -106,24 +106,7 @@ ISR(TIMER2_COMPA_vect) {
   digitalWrite(10, HIGH);
 #endif
 
-  ///////////////////////////////////////////////////////////////////////////////
-
-  // Sequencer pitch shift stuff
-  if (B1_seq_trigger == 1 && tiggertempo == 0) {
-    samples[4].setSpeed(B1_freq_sequence[loopstepf + banko]);
-  }
-
-  if (B1_seq_trigger == 1 && tiggertempo == 1) {
-    samples[4].setSpeed(B1_freq_sequence[loopstep + banko]);
-  }
-
-  if (B2_seq_trigger == 1 && tiggertempo == 0) {
-    samples[5].setSpeed(B1_freq_sequence[loopstepf + banko]);
-  }
-
-  if (B2_seq_trigger == 1 && tiggertempo == 1) {
-    samples[5].setSpeed(B1_freq_sequence[loopstep + banko]);
-  }
+  //////////////////////////////////////////////////////////////////////////////
 
 
   // update all index
