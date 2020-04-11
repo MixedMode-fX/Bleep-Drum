@@ -29,7 +29,7 @@ ISR(TIMER2_COMPA_vect) {
       };
       // sample_sum += samples[i].getSample();
     }
-    if (noise_mode == 1) sample_sum += (((pgm_read_byte(&noise_table[(index_noise)])))) - 127;
+    if (noise_mode == 1) noise_sample = (((pgm_read_byte(&noise_table[(index_noise)])))) - 127;
   }
   else { //reverse
 
@@ -108,70 +108,35 @@ ISR(TIMER2_COMPA_vect) {
 
   ///////////////////////////////////////////////////////////////////////////////
 
+  // Sequencer pitch shift stuff
+  if (B1_seq_trigger == 1 && tiggertempo == 0) {
+    samples[4].setSpeed(B1_freq_sequence[loopstepf + banko]);
+  }
+
+  if (B1_seq_trigger == 1 && tiggertempo == 1) {
+    samples[4].setSpeed(B1_freq_sequence[loopstep + banko]);
+  }
+
+  if (B2_seq_trigger == 1 && tiggertempo == 0) {
+    samples[5].setSpeed(B1_freq_sequence[loopstepf + banko]);
+  }
+
+  if (B2_seq_trigger == 1 && tiggertempo == 1) {
+    samples[5].setSpeed(B1_freq_sequence[loopstep + banko]);
+  }
+
+
+  // update all index
   for(uint8_t i=0; i<N_SAMPLES; i++){
     samples[i].update();
   }
 
 
-  // Sequencer pitch shift stuff
-  // accu_freq_1 += kf;
-  // index_freq_1 = (accu_freq_1 >> (6));
-  if (B1_seq_trigger == 1 && tiggertempo == 0) {
-    samples[4].setSpeed(B1_freq_sequence[loopstepf + banko]);
-    // kfe = kf;
-  }
-
-  if (B1_seq_trigger == 1 && tiggertempo == 1) {
-    samples[4].setSpeed(B1_freq_sequence[loopstep + banko]);
-    // kf = B1_freq_sequence[loopstep + banko];
-    // kfe = kf;
-  }
-
-  if (B2_seq_trigger == 1 && tiggertempo == 0) {
-    samples[5].setSpeed(B1_freq_sequence[loopstepf + banko]);
-    // kfe = kf;
-  }
-
-  if (B2_seq_trigger == 1 && tiggertempo == 1) {
-    samples[5].setSpeed(B1_freq_sequence[loopstep + banko]);
-    // kf = B1_freq_sequence[loopstep + banko];
-    // kfe = kf;
-  }
-
-
-  // if (index_freq_1 > length0) {
-  //   samples[4].reset();
-  //   // kf = 0;
-  //   // index_freq_1 = 0;
-  //   // accu_freq_1 = 0;
-  //   // B1_seq_latch = 0;
-  // }
-
-
-  // accu_freq_2 += pf;
-  // index_freq_2 = (accu_freq_2 >> (6));
-
-  // if (B2_seq_trigger == 1 && tiggertempo == 0) {
-  //   pf = B2_freq_sequence[loopstepf + banko];
-  // }
-
-  // if (B2_seq_trigger == 1 && tiggertempo == 1) {
-  //   pf = B2_freq_sequence[loopstep + banko];
-  // }
-  // if (index_freq_2 > bass_length) {
-  //   pf = 0;
-  //   index_freq_2 = 0;
-  //   accu_freq_2 = 0;
-  //   B2_seq_latch = 0;
-  // }
-
-
-
-  // Noise mode
+  // Noise mode index update
   if (noise_mode == 1) {
-    accumulator_noise += samples[2].getSpeed();
+    accumulator_noise += noise_p1;
     index_noise = (accumulator_noise >> (6));
-    if (index_noise > pot4) {
+    if (index_noise > noise_p2) {
       index_noise = 0;
       accumulator_noise = 0;
     }
