@@ -710,8 +710,8 @@ void BUTTONS() {
 void POTS(){
     if (noise_mode == 0) {
     // USE DAM POT MAPPINGS BECAUSE IT'S FATTER
-    samples[0].setSpeed((analogRead(POT_LEFT) >> 1) + 40);
-    samples[1].setSpeed((analogRead(POT_RIGHT) >> 2) + 2);
+      samples[shift_latch * 2].setSpeed((analogRead(POT_LEFT) >> 2) + 2);
+      samples[shift_latch * 2 + 1].setSpeed((analogRead(POT_RIGHT) >> 2) + 2);
   }
 
   if (noise_mode == 1) {
