@@ -28,17 +28,21 @@ class Sample{
             index = 0;  
         }
 
+        void reset(){
+            accumulator = 0;
+            latch_status = 0;
+            index = 0;
+        }
+
         bool latched(){ return latch_status; }
         void latch(){ latch_status = 1; }
         void unlatch(){ latch_status = 0; }
-        uint16_t getCc(){ return midicc; }
-        uint16_t getPot(){ return pot; }
+        void setSpeed(uint16_t s){ speed = s; }
+        uint16_t getSpeed(){ return speed; }
 
-        void setPot(uint16_t p){ pot = p; }
         void update(){
             if (latch_status == 1) {
-                if (midicc > 4) accumulator += midicc;
-                else accumulator += pot;
+                accumulator += speed;
 
                 index = (accumulator >> 6);
 
@@ -59,8 +63,7 @@ class Sample{
         
         uint8_t latch_status;
 
-        uint16_t midicc = 128;
-        uint16_t pot;
+        uint16_t speed = 128;
 };
 
 

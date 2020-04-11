@@ -19,19 +19,22 @@ https://github.com/jacobanana/Bleep-Drum
 
 
 // Pinout
-#define PLAY 8
-#define REC 19
-#define TAP 18
-#define SHIFT 17
+#define PLAY 8    // D8
+#define REC 19    // A5
+#define TAP 18    // A4
+#define SHIFT 17  // A3
 
-#define RED_PIN 6
-#define BLUE_PIN 2
+#define RED_PIN 2
+#define BLUE_PIN 7
 #define GREEN_PIN 3
 #define YELLOW_PIN 4
 
-#define LED_GREEN 9 // TODO: define correct RGB pins when connected
+#define LED_RED 6
+#define LED_GREEN 5
 #define LED_BLUE 9
-#define LED_RED 5
+
+#define POT_LEFT 0
+#define POT_RIGHT 1
 
 // MIDI VALUES
 #define MIDI_RED 40
@@ -70,7 +73,7 @@ Bounce debouncerYellow = Bounce();
 
 int sample_holder1;
 byte eee, ee;
-byte shift, bankpg, bankpr, bout, rout, gout, prevpot2;
+byte shift, bankpg, bankpr, bout, rout, gout;
 byte bankpb = 4;
 int pot1 = 127;
 int pot2 = 4;
@@ -99,12 +102,14 @@ byte loopstepf = 0;
 byte playmode = 1; // 1 = forward / 0 = reverse
 
 // samples
-#define N_SAMPLES 4
+#define N_SAMPLES 6
 Sample samples[N_SAMPLES] = {
   Sample(*table0, length0),
   Sample(*table1, length1),
   Sample(*table2, length2),
   Sample(*table3, length3),
+  Sample(*table0, length0),
+  Sample(*table1, length1),
 };
 
 
@@ -382,79 +387,76 @@ void loop() {
 
   if (noise_mode == 0) {
     // USE DAM POT MAPPINGS BECAUSE IT'S FATTER
-    pot1 = ((analogRead(1)) >> 2) + 2;
-    pot2 = ((analogRead(0)) >> 1) + 40;
+    samples[0].setSpeed((analogRead(POT_LEFT) >> 1) + 40);
+    samples[1].setSpeed((analogRead(POT_RIGHT) >> 2) + 2);
   }
 
   if (noise_mode == 1) {
 
     if (midinoise == 1) {
-      pot1 = (midicc1 >> 1) + 1;
-      pot2 = (midicc2 >> 2) + 1;
-      pot3 = (midicc3 + 1) << 4;
-      pot4 = (midicc4 + 1) << 2;
-
+      samples[0].setSpeed((samples[0].getSpeed() >> 1) + 1);
+      samples[1].setSpeed((samples[1].getSpeed() >> 2) + 1);
+      samples[2].setSpeed((samples[2].getSpeed() + 1) << 4);
+      samples[3].setSpeed((samples[3].getSpeed() + 1) << 2);
     }
     if (midinoise == 0) {
 
 
       if (shift_latch == 0) {
-        pot1 = ((analogRead(1)) >> 1) + 1;
-        pot2 = ((analogRead(0)) >> 2) + 1;
+        samples[0].setSpeed((analogRead(POT_LEFT) >> 1) + 1);
+        samples[1].setSpeed((analogRead(POT_RIGHT) >> 2) + 1);
       }
       if (shift_latch == 1) {
-
-        pot3 = (analogRead(1)) << 2; ////////////////MAKE ME BETTERERER
-        pot4 = analogRead(0) << 3;
-
+        samples[2].setSpeed((analogRead(POT_LEFT) << 2)); ////////////////MAKE ME BETTERERER
+        samples[3].setSpeed((analogRead(POT_RIGHT) >> 3));
       }
     }
   }
 
-  trigger_in_read = digitalRead(16);
+  // trigger_in_read = digitalRead(16);
 
-  if (trigger_in_read == 1 && prev_trigger_in_read == 0) {
-    trigger_input = 1;
-  }
-  else {
-    trigger_input = 0;
+  // if (trigger_in_read == 1 && prev_trigger_in_read == 0) {
+  //   trigger_input = 1;
+  // }
+  // else {
+  //   trigger_input = 0;
 
-  }
-  prev_trigger_in_read = trigger_in_read;
+  // }
+  // prev_trigger_in_read = trigger_in_read;
 
-  eigth = loopstep % 4;
+  // eigth = loopstep % 4;
 
-  if (tiggertempo == 0) {
+  // if (tiggertempo == 0) {
 
-    if (eigth == 0) {
-      digitalWrite(12, HIGH);
-      // tl++;
-    }
-    else {
-      digitalWrite(12, LOW);
-    }
+  //   if (eigth == 0) {
+  //     digitalWrite(12, HIGH);
+  //     // tl++;
+  //   }
+  //   else {
+  //     digitalWrite(12, LOW);
+  //   }
 
-  }
+  // }
 
-  //////////////////////////////////////////// intput trigger
+  // //////////////////////////////////////////// intput trigger
 
 
 
-  prev_trigger_in_read = trigger_in_read;
+  // prev_trigger_in_read = trigger_in_read;
 
-  trigger_in_read = digitalRead(12);
+  // trigger_in_read = digitalRead(12);
 
-  if (trigger_in_read == 0 && prev_trigger_in_read == 1) {
-    tiggertempo = 1;
-    trigger_step = 1;
-    //digitalWrite(LED_GREEN,HIGH);
+  // if (trigger_in_read == 0 && prev_trigger_in_read == 1) {
+  //   tiggertempo = 1;
+  //   trigger_step = 1;
+  //   //digitalWrite(LED_GREEN,HIGH);
 
-  }
+  // }
 
-  else {
-    trigger_step = 0;
-    //digitalWrite(LED_GREEN,LOW);
-  }
+  // else {
+  //   trigger_step = 0;
+  //   //digitalWrite(LED_GREEN,LOW);
+  // }
 
 
 
@@ -588,15 +590,23 @@ void loop() {
     samples[0].trigger();
   }
 
+  if (B1_seq_trigger == 1){
+    samples[4].trigger();
+  }
+
   if (B2_trigger == 1) {
     samples[1].trigger();
   }
   
-  if (B3_trigger == 1) {
+  if (B1_seq_trigger == 1){
+    samples[5].trigger();
+  }
+
+  if (B3_trigger == 1 || B3_seq_trigger == 1) {
     samples[2].trigger();
   }
   
-  if (B4_trigger == 1) {
+  if (B4_trigger == 1 || B4_seq_trigger == 1) {
     samples[3].trigger();
   }
   
@@ -615,16 +625,18 @@ void loop() {
   //   B4_latch = 1;
   // }
 
-  // if (B1_seq_trigger == 1) {
-  //   index_freq_1 = 0;
-  //   accu_freq_1 = 0;
-  //   B1_seq_latch = 1;
-  // }
-  // if (B2_seq_trigger == 1) {
-  //   index_freq_2 = 0;
-  //   accu_freq_2 = 0;
-  //   B2_seq_latch = 1;
-  // }
+  if (B1_seq_trigger == 1) {
+    samples[4].trigger();
+    // index_freq_1 = 0;
+    // accu_freq_1 = 0;
+    // B1_seq_latch = 1;
+  }
+  if (B2_seq_trigger == 1) {
+    samples[5].trigger();
+    // index_freq_2 = 0;
+    // accu_freq_2 = 0;
+    // B2_seq_latch = 1;
+  }
 
   // if (B2_trigger == 1) {
   //   index2 = 0;
@@ -723,13 +735,13 @@ void RECORD() {
 
     if (B1_trigger == 1) {
       B1_sequence[loopstepf + banko] = 1;
-      B1_freq_sequence[loopstepf + banko] = pot1;
+      B1_freq_sequence[loopstepf + banko] = samples[0].getSpeed();
 
     }
 
     if (B2_trigger == 1) {
       B2_sequence[loopstepf + banko] = 1;
-      B2_freq_sequence[loopstepf + banko] = (pot2);
+      B2_freq_sequence[loopstepf + banko] = samples[1].getSpeed();
     }
 
     if (B4_trigger == 1) {
@@ -749,13 +761,13 @@ void RECORD() {
 
       if (B1_trigger == 1) {
         B1_sequence[loopstep + banko] = 1;
-        B1_freq_sequence[loopstep + banko] = pot1;
+        B1_freq_sequence[loopstep + banko] = samples[0].getSpeed();
 
       }
 
       if (B2_trigger == 1) {
         B2_sequence[loopstep + banko] = 1;
-        B2_freq_sequence[loopstep + banko] = (pot2);
+        B2_freq_sequence[loopstep + banko] = samples[1].getSpeed();
       }
 
       if (B4_trigger == 1) {
@@ -774,8 +786,6 @@ void RECORD() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void LEDS() {
-  //  analogWrite(LED_BLUE,0);
-  //       analogWrite(LED_RED,0);
   analogWrite(LED_BLUE, bout >> 1); //Blue
   analogWrite(LED_GREEN, (gout >> 1) + triggerled); //green
   analogWrite(LED_RED, rout >> 1);
@@ -929,7 +939,6 @@ void BUTTONS() {
   ///////////////////////////////////////////////////sequence select
 
   if (shift == 0 && recordbutton == 1) {
-    prevpot2 = pot2;
     if (button1 == 0 ) { //red
       banko = 63;
 

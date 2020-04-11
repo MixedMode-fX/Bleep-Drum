@@ -20,6 +20,12 @@ ISR(TIMER2_COMPA_vect) {
         case 3:
           sample_sum += pgm_read_byte(&table3[index]) - 127; 
           break;
+        case 4:
+          sample_sum += pgm_read_byte(&table0[index]) - 127; 
+          break;
+        case 5:
+          sample_sum += pgm_read_byte(&table1[index]) - 127; 
+          break;
       };
       // sample_sum += samples[i].getSample();
     }
@@ -42,6 +48,13 @@ ISR(TIMER2_COMPA_vect) {
         case 3:
           sample_sum += pgm_read_byte(&table3[length3 - index]) - 127; 
           break;
+        case 4:
+          sample_sum += pgm_read_byte(&table0[length0 - index]) - 127; 
+          break;
+        case 5:
+          sample_sum += pgm_read_byte(&table1[length1 - index]) - 127; 
+          break;
+
       };
       // sample_sum += samples[i].getSample();
     }
@@ -102,21 +115,35 @@ ISR(TIMER2_COMPA_vect) {
   // Sequencer pitch shift stuff
   // accu_freq_1 += kf;
   // index_freq_1 = (accu_freq_1 >> (6));
-  // if (B1_seq_trigger == 1 && tiggertempo == 0) {
-  //   kf = B1_freq_sequence[loopstepf + banko];
-  //   kfe = kf;
-  // }
+  if (B1_seq_trigger == 1 && tiggertempo == 0) {
+    samples[4].setSpeed(B1_freq_sequence[loopstepf + banko]);
+    // kfe = kf;
+  }
 
-  // if (B1_seq_trigger == 1 && tiggertempo == 1) {
-  //   kf = B1_freq_sequence[loopstep + banko];
-  //   kfe = kf;
-  // }
+  if (B1_seq_trigger == 1 && tiggertempo == 1) {
+    samples[4].setSpeed(B1_freq_sequence[loopstep + banko]);
+    // kf = B1_freq_sequence[loopstep + banko];
+    // kfe = kf;
+  }
 
-  // if (index_freq_1 > tick_length) {
-  //   kf = 0;
-  //   index_freq_1 = 0;
-  //   accu_freq_1 = 0;
-  //   B1_seq_latch = 0;
+  if (B2_seq_trigger == 1 && tiggertempo == 0) {
+    samples[5].setSpeed(B1_freq_sequence[loopstepf + banko]);
+    // kfe = kf;
+  }
+
+  if (B2_seq_trigger == 1 && tiggertempo == 1) {
+    samples[5].setSpeed(B1_freq_sequence[loopstep + banko]);
+    // kf = B1_freq_sequence[loopstep + banko];
+    // kfe = kf;
+  }
+
+
+  // if (index_freq_1 > length0) {
+  //   samples[4].reset();
+  //   // kf = 0;
+  //   // index_freq_1 = 0;
+  //   // accu_freq_1 = 0;
+  //   // B1_seq_latch = 0;
   // }
 
 
