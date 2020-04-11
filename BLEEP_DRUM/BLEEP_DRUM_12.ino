@@ -70,13 +70,10 @@ Bounce debouncerGreen = Bounce();
 Bounce debouncerBlue = Bounce(); 
 Bounce debouncerYellow = Bounce(); 
 
-int sample_holder1;
 byte eee, ee;
 byte shift, bankpg, bankpr, bout, rout, gout;
 byte bankpb = 4;
-int pot1 = 127;
-int pot2 = 4;
-long pot3, pot4;
+
 
 // Sequences
 byte banko = 0; // this defines which 32 steps sequence to use. sequences are stored in a 1D array of length 128
@@ -93,12 +90,9 @@ byte B4_sequence[128] = {
 int B1_freq_sequence[128] = {}; // frequency pots sequences
 int B2_freq_sequence[128] = {};
 
-byte loopstep = 0;
+byte loopstep = 0; // current step in the sequence
 byte loopstepf = 0;
 
-
-// Sample playback
-byte playmode = 1; // 1 = forward / 0 = reverse
 
 // samples
 #define N_SAMPLES 6
@@ -121,12 +115,14 @@ const char noise_table[] PROGMEM = {};
 uint16_t noise_sample, index_noise;
 uint32_t accumulator_noise;
 long noise_p1, noise_p2;
-
+int sample_holder1;
 
 // Modes
 byte play = 0;
 byte recordmode = 1;
-byte noise_mode = 1; // noise mode is activated when pressing shift at boot
+byte noise_mode = 1; // noise mode is activated when pressing shift at boot or via midi
+byte playmode = 1; // 1 = forward / 0 = reverse
+
 
 // Triggers
 byte B1_trigger, B1_loop_trigger;
@@ -159,8 +155,8 @@ byte midi_note_check;
 
 
 // Tap tempo
-byte t, tiggertempo;
-long tapbank[4];
+byte t;
+long tapbank[2];
 
 // MIDI stuff
 byte  miditap, pmiditap, miditap2, midistep, pmidistep, miditempo, midinoise;
@@ -295,13 +291,7 @@ void loop() {
   recordoffsettimer = micros() - prev ;
   offsetamount = taptempof - (taptempof >> 2 );
 
-  if ((recordoffsettimer) > (offsetamount))
-  {
-
-    loopstepf = loopstep + 1;
-    loopstepf %= 32;
-
-  }
+  if ((recordoffsettimer) > (offsetamount)) loopstepf = (loopstep + 1) % 32;
 
   if (play == 1) {
 
@@ -312,52 +302,13 @@ void loop() {
     else {
       prevloopstep = loopstep;
 
-      if (recordmode == 1 && miditempo == 0 && tiggertempo == 0) {
-        if (micros() - prev > (taptempof) ) {
+      if (recordmode == 1 && miditempo == 0 && micros() - prev > (taptempof)) {
           prev = micros();
-
-          loopstep++;
-          if (loopstep > 31)
-          {
-            loopstep = 0;
-          }
-        }
-
+          loopstep = (loopstep + 1) % 32;
       }
 
-      if (miditempo == 1) {
-
-        if (midistep == 1) {
-
-          loopstep++;
-          if (loopstep > 31)
-          {
-            loopstep = 0;
-          }
-        }
-      }
-
-
-      if (tiggertempo == 1) {
-
-        if (trigger_step == 1 && ptrigger_step == 0) {
-
-          triggerled = 30;
-
-          loopstep++;
-          if (loopstep > 31)
-          {
-            loopstep = 0;
-          }
-
-        }
-        else
-          triggerled = 0;
-
-      }
-
+      if (miditempo == 1 && midistep == 1) loopstep = (loopstep + 1) % 32;
       ptrigger_step = trigger_step;
-
     }
 
     B1_loop_trigger = B1_sequence[loopstep + banko];
@@ -368,7 +319,7 @@ void loop() {
   }
 
   if (play == 0) {
-    loopstep = 31;
+    loopstep = 31; // reset sequencer to start on first step when pressing play
     prev = 0;
     B1_loop_trigger = 0;
     B2_loop_trigger = 0;
@@ -384,14 +335,7 @@ void loop() {
 
   if (loopstep != prevloopstep && B1_loop_trigger == 1) {
     samples[4].trigger();
-
-    if (tiggertempo == 0) {
-      samples[4].setSpeed(B1_freq_sequence[loopstepf + banko]);
-    }
-    else{
-      samples[4].setSpeed(B1_freq_sequence[loopstep + banko]);
-    }
-
+    samples[4].setSpeed(B1_freq_sequence[loopstepf + banko]);
   }
 
 
@@ -401,14 +345,7 @@ void loop() {
   
   if (loopstep != prevloopstep && B2_loop_trigger == 1) {
     samples[5].trigger();
-
-    if (tiggertempo == 0) {
-      samples[5].setSpeed(B2_freq_sequence[loopstepf + banko]);
-    }
-    else{
-      samples[5].setSpeed(B2_freq_sequence[loopstep + banko]);
-    }
-
+    samples[5].setSpeed(B2_freq_sequence[loopstepf + banko]);
   }
 
   if (B3_trigger == 1 || (loopstep != prevloopstep && B3_loop_trigger == 1)) {
@@ -426,10 +363,7 @@ void loop() {
   if (shift == 1) {
 
     if (bft == 1 || miditap2 == 1) {
-      tiggertempo = 0;
-
-      t++;
-      t %= 2;
+      t = !t;
       tapbank[t] = ((micros()) - prevtap) >> 2;
       taptempo = ((tapbank[0] + tapbank[1]) >> 1);
       prevtap = micros();
@@ -449,8 +383,7 @@ void RECORD() {
   playbutton = digitalRead(PLAY);
   if (playbutton != pplaybutton && playbutton == LOW && shift == 1) {
     miditempo = 0;
-    play++;
-    play %= 2;
+    play = !play;
   }
   else {
   }
@@ -459,8 +392,7 @@ void RECORD() {
 
   recordbutton = digitalRead(REC);
   if (recordbutton == LOW && recordbutton != precordbutton) {
-    record++;
-    record %= 2;
+    record = !record;
     play = 1;
   }
 
@@ -498,9 +430,7 @@ void RECORD() {
     erase = 0;
   }
 
-
-
-  if (record == 1 && tiggertempo == 0 && miditempo == 0)
+  if (record == 1 && miditempo == 0)
   {
 
     if (B1_trigger == 1) {
@@ -524,33 +454,6 @@ void RECORD() {
 
   }
 
-  if (record == 1)
-  {
-    if (tiggertempo == 1 || miditempo == 1)
-    {
-
-      if (B1_trigger == 1) {
-        B1_sequence[loopstep + banko] = 1;
-        B1_freq_sequence[loopstep + banko] = samples[0].getSpeed();
-
-      }
-
-      if (B2_trigger == 1) {
-        B2_sequence[loopstep + banko] = 1;
-        B2_freq_sequence[loopstep + banko] = samples[1].getSpeed();
-      }
-
-      if (B4_trigger == 1) {
-        B4_sequence[loopstep + banko] = 1;
-      }
-
-      if (B3_trigger == 1) {
-        B3_sequence[loopstep + banko] = 1;
-      }
-
-    }
-
-  }
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -698,8 +601,7 @@ void BUTTONS() {
   shift = digitalRead(SHIFT);
 
   if (shift == 0 && prevshift == 1) {
-    shift_latch++;
-    shift_latch %= 2;
+    shift_latch = !shift_latch;
   }
 
   prevshift = shift;
@@ -737,8 +639,7 @@ void BUTTONS() {
     }
     revbutton = digitalRead(PLAY);
     if (revbutton == 0 && prevrevbutton == 1) {
-      playmode++;
-      playmode %= 2;
+      playmode = !playmode;
 
     }
     prevrevbutton = revbutton;
@@ -904,22 +805,18 @@ void HANDLE_MIDI(){
   }
 
   if (midi_note_check == 67) {
-    play++;
-    play %= 2;
+    play = !play;
   }
 
   if (midi_note_check == 69) {
-    playmode++;
-    playmode %= 2;
+    playmode = !playmode;
   }
 
 
   if (midi_note_check == 70) {
     midinoise = 1;
     shift_latch = 1;
-    noise_mode++;
-    noise_mode %= 2;
-    //   digitalWrite(5,HIGH);
+    noise_mode = !noise_mode;
   }
 
   if (midi_note_check == 72) {
