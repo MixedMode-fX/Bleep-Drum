@@ -305,7 +305,6 @@ void loop() {
   bft = tapbutton == 0 && ptapbutton == 1;
   ptapbutton = tapbutton;
 
-  HANDLE_MIDI();
   LEDS();
   BUTTONS();
   RECORD();
@@ -760,22 +759,52 @@ int midi_note_on() {
         break;
 
       case 0xB0: //control change
-        if (MIDI.getData1() == 70) {
-          samples[0].setSpeed((MIDI.getData2() << 2) + 3);
-        }
+        switch (MIDI.getData1()){
+            case 70:
+              samples[0].setSpeed((MIDI.getData2() << 2) + 3);
+              break;
+            case 71:
+              samples[1].setSpeed((MIDI.getData2() << 2) + 3);
+              break;
+            case 72:
+              samples[2].setSpeed((MIDI.getData2() << 2) + 3);
+              break;
+            case 73:
+              samples[3].setSpeed((MIDI.getData2() << 2) + 3);
+              break;
+            case 57:
+              midistep = 1;
+              miditempo = 1;
+              digitalWrite(5, HIGH);
+              break;
+            case 67:
+              play = !play;
+              break;
+            case 68:
+              midinoise = 1;
+              shift_latch = 1;
+              noise_mode = !noise_mode;
+              break;
+            case 69:
+              playmode = !playmode;
+              break;
+            case 75:
+              banko = 0; //blue  
+              break;
+            case 76:
+              banko = 31; // yellow
+              break;
+            case 77:
+              banko = 63; // red
+              break;
+            case 78:
+              banko = 95;
+              break;
 
-        if (MIDI.getData1() == 71) {
-          samples[1].setSpeed((MIDI.getData2() << 2) + 3);
-        }
+        };
 
-        if (MIDI.getData1() == 72) {
-          samples[2].setSpeed((MIDI.getData2() << 2));
-        }
-
-        if (MIDI.getData1() == 73) {
-          samples[3].setSpeed(MIDI.getData2() << 2);
-        }
-
+        if (MIDI.getData1() != 57) midistep = 0;
+        miditap2 = MIDI.getData1() == 58;
 
       default:
         note = 0;
@@ -787,54 +816,9 @@ int midi_note_on() {
     note = 0;
   }
 
+  pmiditap = miditap;
+  pmidistep = midistep;
+
   return note;
 }
 
-void HANDLE_MIDI(){
-    if (midi_note_check == 58) {
-    miditap2 = 1;
-  }
-  else {
-    miditap2 = 0;
-  }
-  if (midi_note_check == 57) {
-    midistep = 1;
-    miditempo = 1;
-    digitalWrite(5, HIGH);
-  }
-
-  else {
-    midistep = 0;
-  }
-
-  if (midi_note_check == 67) {
-    play = !play;
-  }
-
-  if (midi_note_check == 69) {
-    playmode = !playmode;
-  }
-
-
-  if (midi_note_check == 70) {
-    midinoise = 1;
-    shift_latch = 1;
-    noise_mode = !noise_mode;
-  }
-
-  if (midi_note_check == 72) {
-    banko = 0; //blue
-  }
-  if (midi_note_check == 74) {
-    banko = 31; // yellow
-  }
-  if (midi_note_check == 76) {
-    banko = 63; //red
-  }
-  if (midi_note_check == 77) {
-    banko = 95; //green
-  }
-
-  pmiditap = miditap;
-  pmidistep = midistep;
-}
