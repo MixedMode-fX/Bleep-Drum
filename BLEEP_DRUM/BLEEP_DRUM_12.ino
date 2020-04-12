@@ -42,6 +42,13 @@ https://github.com/jacobanana/Bleep-Drum
 #define MIDI_GREEN 36
 #define MIDI_YELLOW 37
 
+// DAC OPTIONS
+
+#define HALF_SCALE 127
+#define FULL_SCALE 4095
+#define OUTPUT_SHIFT 4
+#define SAMPLE_SHIFT 0
+
 #include <MIDI.h>
 MIDI_CREATE_DEFAULT_INSTANCE();
 
@@ -70,17 +77,17 @@ Bounce debouncerGreen = Bounce();
 Bounce debouncerBlue = Bounce(); 
 Bounce debouncerYellow = Bounce(); 
 
-byte eee, ee;
-byte shift, bankpg, bankpr, bout, rout, gout;
-byte bankpb = 4;
+uint8_t eee, ee;
+uint8_t shift, bankpg, bankpr, bout, rout, gout;
+uint8_t bankpb = 4;
 
 
 // Sequences
-byte banko = 0; // this defines which 32 steps sequence to use. sequences are stored in a 1D array of length 128
-byte B1_sequence[128] = {}; // triggers sequences
-byte B2_sequence[128] = {};
-byte B3_sequence[128] = {};
-byte B4_sequence[128] = {
+uint8_t banko = 0; // this defines which 32 steps sequence to use. sequences are stored in a 1D array of length 128
+uint8_t B1_sequence[128] = {}; // triggers sequences
+uint8_t B2_sequence[128] = {};
+uint8_t B3_sequence[128] = {};
+uint8_t B4_sequence[128] = {
   1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0, // banko = 0
   1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0, // banko = 31
   0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0, // banko = 63
@@ -90,24 +97,24 @@ byte B4_sequence[128] = {
 int B1_freq_sequence[128] = {}; // frequency pots sequences
 int B2_freq_sequence[128] = {};
 
-byte loopstep = 0; // current step in the sequence
-byte loopstepf = 0;
+uint8_t loopstep = 0; // current step in the sequence
+uint8_t loopstepf = 0;
 
 
 // samples
 #define N_SAMPLES 6
 Sample samples[N_SAMPLES] = {
-  Sample(*table0, length0),
-  Sample(*table1, length1),
-  Sample(*table2, length2),
-  Sample(*table3, length3),
-  Sample(*table0, length0),
-  Sample(*table1, length1),
+  Sample(length0),
+  Sample(length1),
+  Sample(length2),
+  Sample(length3),
+  Sample(length0),
+  Sample(length1),
 };
 
 // Sample MIXER
-int sample_sum, sample_sum_b;
-int sample, sample_b; 
+int sample_sum[2];
+int sample[2]; 
 
 
 // Noise mode 
@@ -118,48 +125,54 @@ long noise_p1, noise_p2;
 int sample_holder1;
 
 // Modes
-byte play = 0;
-byte recordmode = 1;
-byte noise_mode = 1; // noise mode is activated when pressing shift at boot or via midi
-byte playmode = 1; // 1 = forward / 0 = reverse
+uint8_t play = 0;
+uint8_t recordmode = 1;
+uint8_t noise_mode = 1; // noise mode is activated when pressing shift at boot or via midi
+uint8_t playmode = 1; // 1 = forward / 0 = reverse
 
+// Output selection
+#ifdef STEREO
+uint8_t outputs[6] = {1,1,1,0,1,1};
+#else
+uint8_t outputs[6] = {0,0,0,0,0,0};
+#endif
 
 // Triggers
-byte B1_trigger, B1_loop_trigger;
-byte B2_trigger, B2_loop_trigger;
-byte B3_trigger, B3_loop_trigger;
-byte B4_trigger, B4_loop_trigger;
+uint8_t B1_trigger, B1_loop_trigger;
+uint8_t B2_trigger, B2_loop_trigger;
+uint8_t B3_trigger, B3_loop_trigger;
+uint8_t B4_trigger, B4_loop_trigger;
 
 long prev; // Previous time
 long prevtap;
 unsigned long taptempo = 8000000;
 unsigned long ratepot;
-byte r, g, b, erase, e, eigth, preveigth;
+uint8_t r, g, b, erase, e, eigth, preveigth;
 
 // Buttons 
-byte recordbutton, precordbutton;
-byte revbutton, prevrevbutton;
-byte playbutton, pplaybutton;
-byte tapbutton, ptapbutton, bft;
-byte prevshift, shift_latch;
-byte record;
+uint8_t recordbutton, precordbutton;
+uint8_t revbutton, prevrevbutton;
+uint8_t playbutton, pplaybutton;
+uint8_t tapbutton, ptapbutton, bft;
+uint8_t prevshift, shift_latch;
+uint8_t record;
 
-byte prevloopstep;
+uint8_t prevloopstep;
 
 // Trigger input
-byte onetime = 1;
-byte trigger_step, triggerled, ptrigger_step;
+uint8_t onetime = 1;
+uint8_t trigger_step, triggerled, ptrigger_step;
 
-byte midi_note_check;
+uint8_t midi_note_check;
 
 
 
 // Tap tempo
-byte t;
+uint8_t t;
 long tapbank[2];
 
 // MIDI stuff
-byte  miditap, pmiditap, miditap2, midistep, pmidistep, miditempo, midinoise;
+uint8_t  miditap, pmiditap, miditap2, midistep, pmidistep, miditempo, midinoise;
 
 unsigned long recordoffsettimer, offsetamount, taptempof;
 
@@ -191,38 +204,53 @@ void setup() {
 
   // Debouncing on note triggers
   debouncerGreen.attach(GREEN_PIN);
-  debouncerGreen.interval(2); // interval in ms
+  debouncerGreen.interval(1); // interval in ms
   debouncerYellow.attach(YELLOW_PIN);
-  debouncerYellow.interval(2); // interval in ms  
+  debouncerYellow.interval(1); // interval in ms  
   debouncerBlue.attach(BLUE_PIN);
-  debouncerBlue.interval(2); // interval in ms
+  debouncerBlue.interval(1); // interval in ms
   debouncerRed.attach(RED_PIN);
-  debouncerRed.interval(2); // interval in ms
+  debouncerRed.interval(1); // interval in ms
 
   delay(100);
 
   /* ======= INIT STATE ========= */
 
-  // Assign MIDI channels at boot using coloured buttons
-  if (digitalRead(RED_PIN) == LOW) {
-    analogWrite(LED_RED, 64);
-    MIDI.begin(1);
+  if (digitalRead(TAP) == 1){
+
+      // Assign MIDI channels at boot using coloured buttons
+      if (digitalRead(RED_PIN) == LOW) {
+        analogWrite(LED_RED, 64);
+        MIDI.begin(1);
+      }
+      else if (digitalRead(BLUE_PIN) == LOW) {
+        analogWrite(LED_BLUE, 64); 
+        MIDI.begin(2);
+      }
+      else if (digitalRead(GREEN_PIN) == LOW) {
+        analogWrite(LED_GREEN, 64);
+        MIDI.begin(3);
+      }
+      else if (digitalRead(YELLOW_PIN) == LOW) {
+        analogWrite(LED_RED, 48);
+        analogWrite(LED_GREEN, 16);
+        MIDI.begin(4);
+      }
+      else {
+        MIDI.begin(0);
+      }
+
   }
-  else if (digitalRead(BLUE_PIN) == LOW) {
-    analogWrite(LED_BLUE, 64); 
-    MIDI.begin(2);
-  }
-  else if (digitalRead(GREEN_PIN) == LOW) {
-    analogWrite(LED_GREEN, 64);
-    MIDI.begin(3);
-  }
-  else if (digitalRead(YELLOW_PIN) == LOW) {
-    analogWrite(LED_RED, 48);
-    analogWrite(LED_GREEN, 16);
-    MIDI.begin(4);
-  }
-  else {
+  else { // press and hold TAP at boot + a pad to assign to 2nd output
     MIDI.begin(0);
+    #ifdef STEREO
+    outputs[0] = digitalRead(RED_PIN);
+    outputs[1] = digitalRead(BLUE_PIN);
+    outputs[2] = digitalRead(GREEN_PIN);
+    outputs[3] = digitalRead(YELLOW_PIN);
+    outputs[4] = digitalRead(RED_PIN);
+    outputs[5] = digitalRead(BLUE_PIN);
+    #endif
   }
   delay(20000); // we're messing with the timers so this isn't actually 20000 Millis
   MIDI.turnThruOff();
@@ -463,20 +491,47 @@ void LEDS() {
   analogWrite(LED_GREEN, (gout >> 1) + triggerled); //green
   analogWrite(LED_RED, rout >> 1);
 
+
+
+  if ( banko == 63) {
+
+    bankpr = 4;
+    bankpg = 0;
+    bankpb = 0;
+  }
+  if ( banko == 31) {
+    bankpr = 4;
+    bankpg = 4;
+    bankpb = 0;
+  }
+  if ( banko == 0) {
+    bankpr = 0;
+    bankpg = 0;
+    bankpb = 8;
+  }
+
+  if ( banko == 95) {
+    bankpr = 0;
+    bankpg = 3;
+    bankpb = 0;
+
+  }
+
+
   if (noise_mode == 1) {
     rout = r;
     gout = g;
     bout = b;
     if (shift_latch == 1) {
       if (record == 0 && play == 0 ) {
-        r += sample >> 3;
+        r += sample[0] >> 3;
         b += 4;
       }
     }
     if (shift_latch == 0) {
 
       if (record == 0 && play == 0 ) {
-        g += sample >> 3;
+        g += sample[0] >> 3;
         b += 2;
 
       }
@@ -599,12 +654,10 @@ void LEDS() {
 
 void BUTTONS() {
   shift = digitalRead(SHIFT);
-
-  if (shift == 0 && prevshift == 1) {
-    shift_latch = !shift_latch;
-  }
-
+  if (shift == 0 && prevshift == 1) shift_latch = !shift_latch;
   prevshift = shift;
+
+
   ///////////////////////////////////////////////////sequence select
 
   if (shift == 0 && recordbutton == 1) {
@@ -631,10 +684,9 @@ void BUTTONS() {
 
     }
 
-
     if (tapbutton == LOW) {
       play = 1;
-      ratepot = (analogRead(14));
+      ratepot = (analogRead(POT_LEFT));
       taptempo = ratepot << 14;
     }
     revbutton = digitalRead(PLAY);
@@ -645,61 +697,12 @@ void BUTTONS() {
     prevrevbutton = revbutton;
   }
 
-  if ( banko == 63) {
-
-    bankpr = 4;
-    bankpg = 0;
-    bankpb = 0;
-  }
-  if ( banko == 31) {
-    bankpr = 4;
-    bankpg = 4;
-    bankpb = 0;
-  }
-  if ( banko == 0) {
-    bankpr = 0;
-    bankpg = 0;
-    bankpb = 8;
-  }
-
-  if ( banko == 95) {
-    bankpr = 0;
-    bankpg = 3;
-    bankpb = 0;
-
-  }
-
-
   if (shift == 1) {
 
-    if (debouncerRed.fell() == 1 || midi_note_check == MIDI_RED) {
-      B1_trigger = 1;
-    }
-    else {
-      B1_trigger = 0;
-    }
-
-    if (debouncerBlue.fell() == 1 || midi_note_check == MIDI_BLUE) {
-      B2_trigger = 1;
-    }
-    else {
-      B2_trigger = 0;
-    }
-
-    if (debouncerGreen.fell() == 1 || midi_note_check == MIDI_GREEN) {
-      B3_trigger = 1;
-    }
-    else {
-      B3_trigger = 0;
-    }
-
-    if (debouncerYellow.fell() == 1 || midi_note_check == MIDI_YELLOW) {
-      B4_trigger = 1;
-    }
-    else {
-      B4_trigger = 0;
-    }
-
+    B1_trigger = (debouncerRed.fell() == 1 || midi_note_check == MIDI_RED);
+    B2_trigger = (debouncerBlue.fell() == 1 || midi_note_check == MIDI_BLUE);
+    B3_trigger = (debouncerGreen.fell() == 1 || midi_note_check == MIDI_GREEN);
+    B4_trigger = (debouncerYellow.fell() == 1 || midi_note_check == MIDI_YELLOW);
 
   }
 
@@ -710,7 +713,7 @@ void BUTTONS() {
 void POTS(){
     if (noise_mode == 0) {
     // USE DAM POT MAPPINGS BECAUSE IT'S FATTER
-      samples[shift_latch * 2].setSpeed((analogRead(POT_LEFT) >> 2) + 2);
+      samples[shift_latch * 2].setSpeed((analogRead(POT_LEFT) >> 1) + 40);
       samples[shift_latch * 2 + 1].setSpeed((analogRead(POT_RIGHT) >> 2) + 2);
   }
 
@@ -740,9 +743,9 @@ void POTS(){
 int midi_note_on() {
 
   int note, velocity;
-  byte r = MIDI.read();
+  uint8_t r = MIDI.read();
   if (r == 1) {                  // Is there a MIDI message incoming ?
-    byte type = MIDI.getType();
+    uint8_t type = MIDI.getType();
     switch (type) {
       case 0x90: //note on. For some reasong "NoteOn" won't work enven though it's declared in midi_Defs.h
         note = MIDI.getData1();

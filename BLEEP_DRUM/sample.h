@@ -4,20 +4,11 @@
 
 class Sample{
     public:
-        Sample(byte **t, uint16_t l){ 
-            table = t; 
+        Sample(uint16_t l){ 
             length = l; 
         };
 
         uint16_t getIndex(){ return index; }    
-        
-        byte getSample(){ 
-            return pgm_read_byte(&table[index]) - 127; 
-        }
-        byte getReverseSample(){
-            return pgm_read_byte(&table[(length - index)]) - 127;
-        }
-
         uint16_t getSampleLength(){ return length; }
         void setAccumulator(uint16_t a){ 
             if(a != 0) accumulator += a; 
@@ -57,7 +48,6 @@ class Sample{
 
 
     private:
-        byte **table;
         uint16_t length;
         uint16_t index;
         uint32_t accumulator;
