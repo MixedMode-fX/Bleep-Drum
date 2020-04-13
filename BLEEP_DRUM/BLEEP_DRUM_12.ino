@@ -42,26 +42,24 @@ https://github.com/jacobanana/Bleep-Drum
 #define MIDI_GREEN 36
 #define MIDI_YELLOW 37
 
-// DAC OPTIONS
+// DEPENDENCIES
 
-#define HALF_SCALE 127
-#define FULL_SCALE 4095
-#define OUTPUT_SHIFT 4
-#define SAMPLE_SHIFT 0
-
+// https://github.com/FortySevenEffects/arduino_midi_library
 #include <MIDI.h>
 MIDI_CREATE_DEFAULT_INSTANCE();
 
-#include <SPI.h>
+// https://github.com/thomasfredericks/Bounce2
 #include <Bounce2.h>
+#define BOUNCE_LOCK_OUT // alternative debouncing method: a lot more responsive, but does not cancel noise.
 
-#define BOUNCE_LOCK_OUT
-// activate the alternative debouncing method. This method is a lot more responsive, but does not cancel noise.
+// DAC
+#include <SPI.h>
 
+// AVR PROGRAM SPACE : https://www.nongnu.org/avr-libc/user-manual/pgmspace.html
 #include <avr/pgmspace.h>
 
-#include "sample.h"
 
+// SAMPLES DATA
 #ifdef DAM
 #include "samples_dam.h"
 #elif DAM2
@@ -72,15 +70,21 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 #include "samples_bleep.h"
 #endif
 
-Bounce debouncerRed = Bounce(); 
-Bounce debouncerGreen = Bounce(); 
-Bounce debouncerBlue = Bounce(); 
-Bounce debouncerYellow = Bounce(); 
+// PLAYBACK & TRIGGERS
+#include "sample_playback.h"
+#define N_SAMPLES 6
+SamplePlayback samples[N_SAMPLES] = {
+  SamplePlayback(length0, RED_PIN),
+  SamplePlayback(length1, BLUE_PIN),
+  SamplePlayback(length2, GREEN_PIN),
+  SamplePlayback(length3, YELLOW_PIN),
+  SamplePlayback(length0), // last two are sequenced samples - they mirror samples[0] and samples[1]
+  SamplePlayback(length1),
+};
 
-uint8_t eee, ee;
-uint8_t shift, bankpg, bankpr, bout, rout, gout;
-uint8_t bankpb = 4;
-
+// Sample MIXER
+int sample_sum[2];
+int sample[2]; 
 
 // Sequences
 uint8_t banko = 0; // this defines which 32 steps sequence to use. sequences are stored in a 1D array of length 128
@@ -99,23 +103,6 @@ int B2_freq_sequence[128] = {};
 
 uint8_t loopstep = 0; // current step in the sequence
 uint8_t loopstepf = 0;
-
-
-// samples
-#define N_SAMPLES 6
-Sample samples[N_SAMPLES] = {
-  Sample(length0),
-  Sample(length1),
-  Sample(length2),
-  Sample(length3),
-  Sample(length0),
-  Sample(length1),
-};
-
-// Sample MIXER
-int sample_sum[2];
-int sample[2]; 
-
 
 // Noise mode 
 const char noise_table[] PROGMEM = {};
@@ -143,11 +130,6 @@ uint8_t B2_trigger, B2_loop_trigger;
 uint8_t B3_trigger, B3_loop_trigger;
 uint8_t B4_trigger, B4_loop_trigger;
 
-long prev; // Previous time
-long prevtap;
-unsigned long taptempo = 8000000;
-unsigned long ratepot;
-uint8_t r, g, b, erase, e, eigth, preveigth;
 
 // Buttons 
 uint8_t recordbutton, precordbutton;
@@ -163,22 +145,36 @@ uint8_t prevloopstep;
 uint8_t onetime = 1;
 uint8_t trigger_step, triggerled, ptrigger_step;
 
+// Tap tempo, LEDs & other stuff
+uint8_t t;
+long tapbank[2];
+long prev; // Previous time
+long prevtap;
+unsigned long taptempo = 8000000;
+unsigned long ratepot;
+uint8_t eee, ee;
+uint8_t shift, bankpg, bankpr, bout, rout, gout;
+uint8_t bankpb = 4;
+unsigned long recordoffsettimer, offsetamount, taptempof;
+uint8_t r, g, b, erase, e, eigth, preveigth;
+
+
+// MIDI stuff
+uint8_t  miditap, pmiditap, miditap2, midistep, pmidistep, miditempo, midinoise;
 uint8_t midi_note_check;
 
 
 
-// Tap tempo
-uint8_t t;
-long tapbank[2];
-
-// MIDI stuff
-uint8_t  miditap, pmiditap, miditap2, midistep, pmidistep, miditempo, midinoise;
-
-unsigned long recordoffsettimer, offsetamount, taptempof;
-
 void setup() {
   Serial.begin(9600);
 
+
+  // Setup sample switches
+  for (uint8_t i=0; i<N_SAMPLES; i++){
+    samples[i].setup();
+  }
+
+  // Default playback speed for bottom 2 samples
   samples[2].setSpeed(157); // default snare is pitched up
   samples[3].setSpeed(128);
 
@@ -197,20 +193,6 @@ void setup() {
   pinMode (TAP, INPUT_PULLUP);    
   pinMode (SHIFT, INPUT_PULLUP);  
 
-  pinMode (GREEN_PIN, INPUT_PULLUP);   //low left clap green
-  pinMode (YELLOW_PIN, INPUT_PULLUP);   // low right kick yellow
-  pinMode (BLUE_PIN, INPUT_PULLUP);    //Up Right tom Blue
-  pinMode (RED_PIN, INPUT_PULLUP);   // Up right pew red
-
-  // Debouncing on note triggers
-  debouncerGreen.attach(GREEN_PIN);
-  debouncerGreen.interval(1); // interval in ms
-  debouncerYellow.attach(YELLOW_PIN);
-  debouncerYellow.interval(1); // interval in ms  
-  debouncerBlue.attach(BLUE_PIN);
-  debouncerBlue.interval(1); // interval in ms
-  debouncerRed.attach(RED_PIN);
-  debouncerRed.interval(1); // interval in ms
 
   delay(100);
 
@@ -295,10 +277,9 @@ void loop() {
 
   midi_note_check = midi_note_on();
 
-  debouncerRed.update();
-  debouncerBlue.update();
-  debouncerGreen.update();
-  debouncerYellow.update();
+  for(uint8_t i=0; i<4; i++) {
+    samples[i].btn_update();
+  }
 
   // tap tempo  
   tapbutton = digitalRead(TAP);
@@ -660,22 +641,22 @@ void BUTTONS() {
   ///////////////////////////////////////////////////sequence select
 
   if (shift == 0 && recordbutton == 1) {
-    if (debouncerRed.read() == 0 ) { //red
+    if (samples[0].read() == 0 ) { //red
       banko = 63;
     }
-    if (debouncerYellow.read() == 0) { //yellow
+    if (samples[1].read() == 0) { //yellow
       banko = 31;
       bankpr = 4;
       bankpg = 4;
       bankpb = 0;
     }
-    if (debouncerBlue.read() == 0 || banko == 0) { //blue
+    if (samples[2].read() == 0 || banko == 0) { //blue
       banko = 0;
       bankpr = 0;
       bankpg = 0;
       bankpb = 8;
     }
-    if (debouncerGreen.read() == 0) { //green
+    if (samples[3].read() == 0) { //green
       banko = 95;
       bankpr = 0;
       bankpg = 3;
@@ -698,10 +679,10 @@ void BUTTONS() {
 
   if (shift == 1) {
 
-    B1_trigger = (debouncerRed.fell() == 1 || midi_note_check == MIDI_RED);
-    B2_trigger = (debouncerBlue.fell() == 1 || midi_note_check == MIDI_BLUE);
-    B3_trigger = (debouncerGreen.fell() == 1 || midi_note_check == MIDI_GREEN);
-    B4_trigger = (debouncerYellow.fell() == 1 || midi_note_check == MIDI_YELLOW);
+    B1_trigger = (samples[0].fell() || midi_note_check == MIDI_RED);
+    B2_trigger = (samples[1].fell() || midi_note_check == MIDI_BLUE);
+    B3_trigger = (samples[2].fell() || midi_note_check == MIDI_GREEN);
+    B4_trigger = (samples[3].fell() || midi_note_check == MIDI_YELLOW);
 
   }
 

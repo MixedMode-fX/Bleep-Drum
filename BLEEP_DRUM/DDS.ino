@@ -1,11 +1,8 @@
 ISR(TIMER2_COMPA_vect) {
   OCR2A = 40;
 
-
   sample_sum[0] = 0;
   sample_sum[1] = 0;
-  uint16_t index;
-  uint8_t output;
   if(playmode){
       sample_sum[outputs[0]] += pgm_read_byte(&table0[samples[0].getIndex()]) - 127; 
       sample_sum[outputs[1]] += pgm_read_byte(&table1[samples[1].getIndex()]) - 127; 
@@ -49,16 +46,16 @@ ISR(TIMER2_COMPA_vect) {
     sample[1] = (sample_sum[1]) + 127;
   }
 
-  uint16_t sample_out[2] = {constrain(sample[0], 0, 255) << 4, constrain(sample[1], 0, 255) << 4};
+  uint8_t sample_out[2] = {constrain(sample[0], 0, 255), constrain(sample[1], 0, 255)};
 
-  uint16_t dac_out = (0 << 15) | (1 << 14) | (1 << 13) | (1 << 12) | ( sample_out[0] );
+  uint16_t dac_out = (0 << 15) | (1 << 14) | (1 << 13) | (1 << 12) | ( sample_out[0] << 4 );
   digitalWrite(10, LOW);
   SPI.transfer(dac_out >> 8);
   SPI.transfer(dac_out & 255);
   digitalWrite(10, HIGH);
 
 #ifdef STEREO
-  uint16_t dac_outb = (1 << 15) | (1 << 14) | (1 << 13) | (1 << 12) | ( sample_out[1] );
+  uint16_t dac_outb = (1 << 15) | (1 << 14) | (1 << 13) | (1 << 12) | ( sample_out[1] << 4 );
   digitalWrite(10, LOW);
   SPI.transfer(dac_outb >> 8);
   SPI.transfer(dac_outb & 255);
