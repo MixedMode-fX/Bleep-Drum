@@ -169,8 +169,8 @@ void setup() {
   samples[2].setSpeed(157); // default snare is pitched up
   samples[3].setSpeed(128);
 
-  samples[0].setFreqSequence(B1_freq_sequence);
-  samples[1].setFreqSequence(B2_freq_sequence);
+  samples[0].setSpeedSequence(B1_freq_sequence);
+  samples[1].setSpeedSequence(B2_freq_sequence);
   
 
   randomSeed(analogRead(0));
@@ -337,7 +337,7 @@ void loop() {
        // the first 2 samples use the 2nd phaser 
       samples[i].trigger(i < 2);
       // this allows a different playback speed for the sequenced sounds
-      if(i < 2) samples[i].setSpeed(samples[i].getFreqStep(loopstepf + banko), 1);
+      if(i < 2) samples[i].setSpeed(samples[i].getSpeedStep(loopstepf + banko), 1);
     }
 
   }

@@ -78,13 +78,13 @@ class SamplePlayback{
 
         void setStep(uint8_t index, uint8_t value, uint16_t s){ 
             sequence[index] = value; 
-            if (freq_sequence != nullptr) freq_sequence[index] = s;
+            if (speed_sequence != nullptr) speed_sequence[index] = s;
         }
         uint8_t getStep(uint8_t index){ return sequence[index]; }
 
-        void setFreqSequence(uint16_t *s){ freq_sequence = s; }
-        void setFreqStep(uint8_t index, uint16_t value){ freq_sequence[index] = value; }
-        uint16_t getFreqStep(uint8_t index){ return freq_sequence[index]; }
+        void setSpeedSequence(uint16_t *s){ speed_sequence = s; }
+        void setSpeedStep(uint8_t index, uint16_t value){ speed_sequence[index] = value; }
+        uint16_t getSpeedStep(uint8_t index){ return speed_sequence[index]; }
 
         void setLoopTrigger(uint8_t index){ loop_trigger = sequence[index]; }
         uint8_t getLoopTrigger(){ return loop_trigger; }
@@ -93,16 +93,7 @@ class SamplePlayback{
     private:
         // Sample
         uint16_t length;
-        Phaser phaser[2];
-        // uint8_t latch_status;
-        // uint16_t index;
-        // uint32_t accumulator;
-        // uint16_t speed = 128;
-
-        // uint8_t sequenced_latch_status;
-        // uint16_t sequenced_index;
-        // uint32_t sequenced_accumulator;
-        // uint16_t sequenced_speed = 128;
+        Phaser phaser[2]; // 2nd phaser is used for variable speed sequencing
 
         // MIDI
         uint8_t midi_note;
@@ -114,7 +105,7 @@ class SamplePlayback{
 
         // Sequencer
         uint8_t sequence[128] = {};
-        uint16_t *freq_sequence; // not enough RAM for 4x freq sequences...
+        uint16_t *speed_sequence; // not enough RAM for 4x speed sequences...
         uint8_t loop_trigger;
 };
 
