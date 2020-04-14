@@ -1,17 +1,20 @@
 #ifndef SAMPLE_H
 #define SAMPLE_H
 
-// #include "Arduino.h"
+struct Phaser{
+    uint8_t latch_status;
+    uint16_t index;
+    uint32_t accumulator;
+    uint16_t speed = 128;
+};
 
 
 class SamplePlayback{
     public:
-        SamplePlayback(uint16_t l){ 
-            length = l; 
-        };
-        SamplePlayback(uint16_t l, uint8_t p){ 
+        SamplePlayback(uint16_t l, uint8_t p, uint8_t n){ 
             length = l; 
             button_pin = p;
+            midi_note = n;
         };
 
         void setup(){
@@ -28,54 +31,91 @@ class SamplePlayback{
         bool fell(){ return button_debouncer.fell(); }
         bool rose(){ return button_debouncer.rose(); }
 
-        uint16_t getIndex(){ return index; }    
         uint16_t getSampleLength(){ return length; }
-        void setAccumulator(uint16_t a){ 
-            if(a != 0) accumulator += a; 
-            else accumulator = 0;
-        }
-        void trigger(){ 
-            accumulator = 0;
-            latch_status = 1;
-            index = 0;  
-        }
 
-        void reset(){
-            accumulator = 0;
-            latch_status = 0;
-            index = 0;
+        void setTriggerFlag(uint8_t incoming_midi_note){
+            trigger_flag = fell() || incoming_midi_note == midi_note;
+        }
+        uint8_t getTriggerFlag(){ return trigger_flag; }
+
+        void setAccumulator(uint16_t a, uint8_t p = 0){ 
+            if(a != 0) phaser[p].accumulator += a; 
+            else phaser[p].accumulator = 0;
         }
 
-        bool latched(){ return latch_status; }
-        void latch(){ latch_status = 1; }
-        void unlatch(){ latch_status = 0; }
-        void setSpeed(uint16_t s){ speed = s; }
-        uint16_t getSpeed(){ return speed; }
+        void trigger(uint8_t p = 0){ 
+            phaser[p].accumulator = 0;
+            phaser[p].latch_status = 1;
+            phaser[p].index = 0;  
+        }
+        
+        void reset(uint8_t p = 0){
+            phaser[p].accumulator = 0;
+            phaser[p].latch_status = 0;
+            phaser[p].index = 0;
+        }
 
-        void update(){
-            if (latch_status == 1) {
-                accumulator += speed;
+        bool latched(uint8_t p = 0){ return phaser[p].latch_status; }
+        void latch(uint8_t p = 0){ phaser[p].latch_status = 1; }
+        void unlatch(uint8_t p = 0){ phaser[p].latch_status = 0; }
 
-                index = (accumulator >> 6);
+        void setSpeed(uint16_t s, uint8_t p = 0){ phaser[p].speed = s; }
+        uint16_t getSpeed(uint8_t p = 0){ return phaser[p].speed; }
 
-                if (index > length) {
-                    index = 0;
-                    accumulator = 0;
-                    latch_status = 0;
-                }
+        void update(uint8_t p){
+            if (phaser[p].latch_status == 1) {
+                phaser[p].accumulator += phaser[p].speed;
+                phaser[p].index = (phaser[p].accumulator >> 6);
+                if (phaser[p].index > length) reset(p);
             }
         }
+        void update(){
+            update(0);
+            update(1);
+        }
 
+        uint16_t getIndex(uint8_t p = 0){ return phaser[p].index; }    
+
+        void setStep(uint8_t index, uint8_t value, uint16_t s){ 
+            sequence[index] = value; 
+            if (freq_sequence != nullptr) freq_sequence[index] = s;
+        }
+        uint8_t getStep(uint8_t index){ return sequence[index]; }
+
+        void setFreqSequence(uint16_t *s){ freq_sequence = s; }
+        void setFreqStep(uint8_t index, uint16_t value){ freq_sequence[index] = value; }
+        uint16_t getFreqStep(uint8_t index){ return freq_sequence[index]; }
+
+        void setLoopTrigger(uint8_t index){ loop_trigger = sequence[index]; }
+        uint8_t getLoopTrigger(){ return loop_trigger; }
+        uint8_t getMidiNote(){ return midi_note; }
 
     private:
+        // Sample
         uint16_t length;
-        uint16_t index;
-        uint32_t accumulator;
-        uint8_t latch_status;
-        uint16_t speed = 128;
+        Phaser phaser[2];
+        // uint8_t latch_status;
+        // uint16_t index;
+        // uint32_t accumulator;
+        // uint16_t speed = 128;
 
+        // uint8_t sequenced_latch_status;
+        // uint16_t sequenced_index;
+        // uint32_t sequenced_accumulator;
+        // uint16_t sequenced_speed = 128;
+
+        // MIDI
+        uint8_t midi_note;
+
+        // Trigger Button
         uint8_t button_pin = 0;
-        Bounce button_debouncer = Bounce(); 
+        Bounce button_debouncer = Bounce();
+        uint8_t trigger_flag;
+
+        // Sequencer
+        uint8_t sequence[128] = {};
+        uint16_t *freq_sequence; // not enough RAM for 4x freq sequences...
+        uint8_t loop_trigger;
 };
 
 

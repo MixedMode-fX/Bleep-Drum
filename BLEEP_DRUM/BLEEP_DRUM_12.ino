@@ -19,20 +19,25 @@ https://github.com/jacobanana/Bleep-Drum
 
 
 // Pinout
+
+// CONTROLS
 #define PLAY 8    // D8
 #define REC 19    // A5
 #define TAP 18    // A4
 #define SHIFT 17  // A3
 
-#define RED_PIN 2
-#define BLUE_PIN 7
-#define GREEN_PIN 3
-#define YELLOW_PIN 4
+// TRIGGERS
+#define PIN_RED 2
+#define PIN_BLUE 7
+#define PIN_GREEN 3
+#define PIN_YELLOW 4
 
+// LEDs
 #define LED_RED 6
 #define LED_GREEN 5
 #define LED_BLUE 9
 
+// POTS
 #define POT_LEFT 0
 #define POT_RIGHT 1
 
@@ -41,6 +46,8 @@ https://github.com/jacobanana/Bleep-Drum
 #define MIDI_BLUE 41
 #define MIDI_GREEN 36
 #define MIDI_YELLOW 37
+
+
 
 // DEPENDENCIES
 
@@ -72,37 +79,34 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 
 // PLAYBACK & TRIGGERS
 #include "sample_playback.h"
-#define N_SAMPLES 6
+#define N_SAMPLES 4
 SamplePlayback samples[N_SAMPLES] = {
-  SamplePlayback(length0, RED_PIN),
-  SamplePlayback(length1, BLUE_PIN),
-  SamplePlayback(length2, GREEN_PIN),
-  SamplePlayback(length3, YELLOW_PIN),
-  SamplePlayback(length0), // last two are sequenced samples - they mirror samples[0] and samples[1]
-  SamplePlayback(length1),
+  SamplePlayback(length0, PIN_RED, MIDI_RED),
+  SamplePlayback(length1, PIN_BLUE, MIDI_BLUE),
+  SamplePlayback(length2, PIN_GREEN, MIDI_GREEN),
+  SamplePlayback(length3, PIN_YELLOW, MIDI_YELLOW),
 };
 
-// Sample MIXER
+// Sample Mixer & output
 int sample_sum[2];
 int sample[2]; 
 
 // Sequences
 uint8_t banko = 0; // this defines which 32 steps sequence to use. sequences are stored in a 1D array of length 128
-uint8_t B1_sequence[128] = {}; // triggers sequences
-uint8_t B2_sequence[128] = {};
-uint8_t B3_sequence[128] = {};
-uint8_t B4_sequence[128] = {
-  1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0, // banko = 0
-  1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0 , 1, 0, 0, 0 , 0, 0, 0, 0, // banko = 31
-  0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0, // banko = 63
-  1, 1, 1, 1 , 1, 1, 1, 1 , 1, 1, 1, 1 , 1, 1, 1, 1 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0 , 0, 0, 0, 0, // banko = 95
-};
 
-int B1_freq_sequence[128] = {}; // frequency pots sequences
-int B2_freq_sequence[128] = {};
+// Pot position sequences for the top 2 samples
+uint16_t B1_freq_sequence[128] = {}; // because of the amount of RAM we have available, we can only have 2. 
+uint16_t B2_freq_sequence[128] = {}; // Technically, there is enough space for 3 but that would feel awkward
 
-uint8_t loopstep = 0; // current step in the sequence
+// current step in the sequence
+uint8_t loopstep = 0;
 uint8_t loopstepf = 0;
+
+// Modes
+uint8_t play = 0;
+uint8_t recordmode = 1;
+uint8_t noise_mode = 1; // noise mode is activated when pressing shift at boot or via midi
+uint8_t playmode = 1; // 1 = forward / 0 = reverse
 
 // Noise mode 
 const char noise_table[] PROGMEM = {};
@@ -111,25 +115,12 @@ uint32_t accumulator_noise;
 long noise_p1, noise_p2;
 int sample_holder1;
 
-// Modes
-uint8_t play = 0;
-uint8_t recordmode = 1;
-uint8_t noise_mode = 1; // noise mode is activated when pressing shift at boot or via midi
-uint8_t playmode = 1; // 1 = forward / 0 = reverse
-
 // Output selection
 #ifdef STEREO
-uint8_t outputs[6] = {1,1,1,0,1,1};
+uint8_t outputs[4] = {1,1,1,0}; // kick is sent to its own output by default
 #else
-uint8_t outputs[6] = {0,0,0,0,0,0};
+uint8_t outputs[] = {0,0,0,0};
 #endif
-
-// Triggers
-uint8_t B1_trigger, B1_loop_trigger;
-uint8_t B2_trigger, B2_loop_trigger;
-uint8_t B3_trigger, B3_loop_trigger;
-uint8_t B4_trigger, B4_loop_trigger;
-
 
 // Buttons 
 uint8_t recordbutton, precordbutton;
@@ -178,6 +169,10 @@ void setup() {
   samples[2].setSpeed(157); // default snare is pitched up
   samples[3].setSpeed(128);
 
+  samples[0].setFreqSequence(B1_freq_sequence);
+  samples[1].setFreqSequence(B2_freq_sequence);
+  
+
   randomSeed(analogRead(0));
   cli(); // disable interrupt
   taptempo = 4000000;
@@ -201,19 +196,19 @@ void setup() {
   if (digitalRead(TAP) == 1){
 
       // Assign MIDI channels at boot using coloured buttons
-      if (digitalRead(RED_PIN) == LOW) {
+      if (digitalRead(PIN_RED) == LOW) {
         analogWrite(LED_RED, 64);
         MIDI.begin(1);
       }
-      else if (digitalRead(BLUE_PIN) == LOW) {
+      else if (digitalRead(PIN_BLUE) == LOW) {
         analogWrite(LED_BLUE, 64); 
         MIDI.begin(2);
       }
-      else if (digitalRead(GREEN_PIN) == LOW) {
+      else if (digitalRead(PIN_GREEN) == LOW) {
         analogWrite(LED_GREEN, 64);
         MIDI.begin(3);
       }
-      else if (digitalRead(YELLOW_PIN) == LOW) {
+      else if (digitalRead(PIN_YELLOW) == LOW) {
         analogWrite(LED_RED, 48);
         analogWrite(LED_GREEN, 16);
         MIDI.begin(4);
@@ -226,12 +221,12 @@ void setup() {
   else { // press and hold TAP at boot + a pad to assign to 2nd output
     MIDI.begin(0);
     #ifdef STEREO
-    outputs[0] = digitalRead(RED_PIN);
-    outputs[1] = digitalRead(BLUE_PIN);
-    outputs[2] = digitalRead(GREEN_PIN);
-    outputs[3] = digitalRead(YELLOW_PIN);
-    outputs[4] = digitalRead(RED_PIN);
-    outputs[5] = digitalRead(BLUE_PIN);
+    outputs[0] = digitalRead(PIN_RED);
+    outputs[1] = digitalRead(PIN_BLUE);
+    outputs[2] = digitalRead(PIN_GREEN);
+    outputs[3] = digitalRead(PIN_YELLOW);
+    outputs[4] = digitalRead(PIN_RED);
+    outputs[5] = digitalRead(PIN_BLUE);
     #endif
   }
   delay(20000); // we're messing with the timers so this isn't actually 20000 Millis
@@ -265,12 +260,6 @@ void setup() {
   sei(); // enable interrupt
 
 }
-
-
-
-
-
-
 
 
 void loop() {
@@ -319,49 +308,38 @@ void loop() {
       ptrigger_step = trigger_step;
     }
 
-    B1_loop_trigger = B1_sequence[loopstep + banko];
-    B2_loop_trigger = B2_sequence[loopstep + banko];
-    B3_loop_trigger = B3_sequence[loopstep + banko];
-    B4_loop_trigger = B4_sequence[loopstep + banko];
+    samples[0].setLoopTrigger(loopstep + banko);
+    samples[1].setLoopTrigger(loopstep + banko);
+    samples[2].setLoopTrigger(loopstep + banko);
+    samples[3].setLoopTrigger(loopstep + banko);
 
   }
 
   if (play == 0) {
     loopstep = 31; // reset sequencer to start on first step when pressing play
     prev = 0;
-    B1_loop_trigger = 0;
-    B2_loop_trigger = 0;
-    B3_loop_trigger = 0;
-    B4_loop_trigger = 0;
-
+    samples[0].setLoopTrigger(0);
+    samples[1].setLoopTrigger(0);
+    samples[2].setLoopTrigger(0);
+    samples[3].setLoopTrigger(0);
   }
 
 
-  if (B1_trigger == 1) {
-    samples[0].trigger();
-  }
+  for(uint8_t i=0; i<N_SAMPLES; i++){
+    
+    // live triggers
+    if(samples[i].getTriggerFlag()) {
+      samples[i].trigger();
+    }
 
-  if (loopstep != prevloopstep && B1_loop_trigger == 1) {
-    samples[4].trigger();
-    samples[4].setSpeed(B1_freq_sequence[loopstepf + banko]);
-  }
+    // sequenced triggers
+    if(loopstep != prevloopstep && samples[i].getLoopTrigger() == 1){
+       // the first 2 samples use the 2nd phaser 
+      samples[i].trigger(i < 2);
+      // this allows a different playback speed for the sequenced sounds
+      if(i < 2) samples[i].setSpeed(samples[i].getFreqStep(loopstepf + banko), 1);
+    }
 
-
-  if (B2_trigger == 1) {
-    samples[1].trigger();
-  }
-  
-  if (loopstep != prevloopstep && B2_loop_trigger == 1) {
-    samples[5].trigger();
-    samples[5].setSpeed(B2_freq_sequence[loopstepf + banko]);
-  }
-
-  if (B3_trigger == 1 || (loopstep != prevloopstep && B3_loop_trigger == 1)) {
-    samples[2].trigger();
-  }
-  
-  if (B4_trigger == 1 || (loopstep != prevloopstep && B4_loop_trigger == 1)) {
-    samples[3].trigger();
   }
   
   //////////////////////////////////////////////////////////////// T A P
@@ -422,10 +400,10 @@ void RECORD() {
       erase = 1;
       play = 1;
       record = 0;
-      B1_sequence[ee + banko] = 0;
-      B2_sequence[ee + banko] = 0;
-      B4_sequence[ee + banko] = 0;
-      B3_sequence[ee + banko] = 0;
+      samples[0].setStep(ee + banko, 0, 0);
+      samples[1].setStep(ee + banko, 0, 0);
+      samples[2].setStep(ee + banko, 0, 0);
+      samples[3].setStep(ee + banko, 0, 0);
       ee++;
       if (ee == 32) {
         ee = 0;
@@ -441,23 +419,8 @@ void RECORD() {
   if (record == 1 && miditempo == 0)
   {
 
-    if (B1_trigger == 1) {
-      B1_sequence[loopstepf + banko] = 1;
-      B1_freq_sequence[loopstepf + banko] = samples[0].getSpeed();
-
-    }
-
-    if (B2_trigger == 1) {
-      B2_sequence[loopstepf + banko] = 1;
-      B2_freq_sequence[loopstepf + banko] = samples[1].getSpeed();
-    }
-
-    if (B4_trigger == 1) {
-      B4_sequence[loopstepf + banko] = 1;
-    }
-
-    if (B3_trigger == 1) {
-      B3_sequence[loopstepf + banko] = 1;
+    for(uint8_t i=0; i<N_SAMPLES; i++){
+      if(samples[i].getTriggerFlag()) samples[i].setStep(loopstepf + banko, 1, samples[i].getSpeed());
     }
 
   }
@@ -679,10 +642,9 @@ void BUTTONS() {
 
   if (shift == 1) {
 
-    B1_trigger = (samples[0].fell() || midi_note_check == MIDI_RED);
-    B2_trigger = (samples[1].fell() || midi_note_check == MIDI_BLUE);
-    B3_trigger = (samples[2].fell() || midi_note_check == MIDI_GREEN);
-    B4_trigger = (samples[3].fell() || midi_note_check == MIDI_YELLOW);
+    for(uint8_t i=0; i<N_SAMPLES; i++){
+      samples[i].setTriggerFlag(midi_note_check);
+    }
 
   }
 

@@ -8,8 +8,9 @@ ISR(TIMER2_COMPA_vect) {
       sample_sum[outputs[1]] += pgm_read_byte(&table1[samples[1].getIndex()]) - 127; 
       sample_sum[outputs[2]] += pgm_read_byte(&table2[samples[2].getIndex()]) - 127; 
       sample_sum[outputs[3]] += pgm_read_byte(&table3[samples[3].getIndex()]) - 127; 
-      sample_sum[outputs[4]] += pgm_read_byte(&table0[samples[4].getIndex()]) - 127; 
-      sample_sum[outputs[5]] += pgm_read_byte(&table1[samples[5].getIndex()]) - 127; 
+
+      sample_sum[outputs[0]] += pgm_read_byte(&table0[samples[0].getIndex(1)]) - 127; 
+      sample_sum[outputs[1]] += pgm_read_byte(&table1[samples[1].getIndex(1)]) - 127; 
       if (noise_mode == 1) noise_sample = (((pgm_read_byte(&noise_table[(index_noise)])))) - 127;
   }
   else { //reverse
@@ -18,8 +19,11 @@ ISR(TIMER2_COMPA_vect) {
       sample_sum[outputs[1]] += pgm_read_byte(&table1[length1 - samples[1].getIndex()]) - 127; 
       sample_sum[outputs[2]] += pgm_read_byte(&table2[length2 - samples[2].getIndex()]) - 127; 
       sample_sum[outputs[3]] += pgm_read_byte(&table3[length3 - samples[3].getIndex()]) - 127; 
-      sample_sum[outputs[4]] += pgm_read_byte(&table0[length0 - samples[4].getIndex()]) - 127; 
-      sample_sum[outputs[5]] += pgm_read_byte(&table1[length1 - samples[5].getIndex()]) - 127; 
+
+      sample_sum[outputs[0]] += pgm_read_byte(&table0[length0 - samples[0].getIndex(1)]) - 127; 
+      sample_sum[outputs[1]] += pgm_read_byte(&table1[length1 - samples[1].getIndex(1)]) - 127; 
+      // sample_sum[outputs[4]] += pgm_read_byte(&table0[length0 - samples[4].getIndex()]) - 127; 
+      // sample_sum[outputs[5]] += pgm_read_byte(&table1[length1 - samples[5].getIndex()]) - 127; 
 
     // original had no noise in reverse ??
   }
