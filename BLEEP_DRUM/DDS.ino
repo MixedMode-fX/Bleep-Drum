@@ -1,5 +1,5 @@
 ISR(TIMER2_COMPA_vect) {
-  OCR2A = 40;
+  OCR2A = sample_rate; // 40
 
   sample_sum[0] = 0;
   sample_sum[1] = 0;
@@ -9,9 +9,10 @@ ISR(TIMER2_COMPA_vect) {
       sample_sum[outputs[2]] += pgm_read_byte(&table2[samples[2].getIndex()]) - 127; 
       sample_sum[outputs[3]] += pgm_read_byte(&table3[samples[3].getIndex()]) - 127; 
 
+      // samples with sequenced playback speed
       sample_sum[outputs[0]] += pgm_read_byte(&table0[samples[0].getIndex(1)]) - 127; 
       sample_sum[outputs[1]] += pgm_read_byte(&table1[samples[1].getIndex(1)]) - 127; 
-      if (noise_mode == 1) noise_sample = (((pgm_read_byte(&noise_table[(index_noise)])))) - 127;
+      if (noise_mode == 1) sample_noise = (((pgm_read_byte(&noise_table[(index_noise)])))) - 127;
   }
   else { //reverse
 
@@ -20,16 +21,15 @@ ISR(TIMER2_COMPA_vect) {
       sample_sum[outputs[2]] += pgm_read_byte(&table2[length2 - samples[2].getIndex()]) - 127; 
       sample_sum[outputs[3]] += pgm_read_byte(&table3[length3 - samples[3].getIndex()]) - 127; 
 
+      // samples with sequenced playback speed
       sample_sum[outputs[0]] += pgm_read_byte(&table0[length0 - samples[0].getIndex(1)]) - 127; 
       sample_sum[outputs[1]] += pgm_read_byte(&table1[length1 - samples[1].getIndex(1)]) - 127; 
-      // sample_sum[outputs[4]] += pgm_read_byte(&table0[length0 - samples[4].getIndex()]) - 127; 
-      // sample_sum[outputs[5]] += pgm_read_byte(&table1[length1 - samples[5].getIndex()]) - 127; 
 
     // original had no noise in reverse ??
   }
 
   if (noise_mode == 1) {
-    sample_holder1 = ((sample_sum[0] + sample_sum[1]) ^ (noise_sample >> 1)) + 127;
+    sample_holder1 = ((sample_sum[0] + sample_sum[1]) ^ (sample_noise >> 1)) + 127;
 
     uint8_t latch = 0;
     for (uint8_t i=0; i<4; i++){
@@ -49,6 +49,9 @@ ISR(TIMER2_COMPA_vect) {
     sample[0] = (sample_sum[0]) + 127;
     sample[1] = (sample_sum[1]) + 127;
   }
+
+
+  // DAC Writes
 
   uint8_t sample_out[2] = {constrain(sample[0], 0, 255), constrain(sample[1], 0, 255)};
 

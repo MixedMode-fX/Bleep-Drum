@@ -110,7 +110,7 @@ uint8_t playmode = 1; // 1 = forward / 0 = reverse
 
 // Noise mode 
 const char noise_table[] PROGMEM = {};
-uint16_t noise_sample, index_noise;
+uint16_t sample_noise, index_noise;
 uint32_t accumulator_noise;
 long noise_p1, noise_p2;
 int sample_holder1;
@@ -121,6 +121,9 @@ uint8_t outputs[4] = {1,1,1,0}; // kick is sent to its own output by default
 #else
 uint8_t outputs[] = {0,0,0,0};
 #endif
+
+// Sample Rate control
+uint8_t sample_rate = 40;
 
 // Buttons 
 uint8_t recordbutton, precordbutton;
@@ -149,11 +152,9 @@ uint8_t bankpb = 4;
 unsigned long recordoffsettimer, offsetamount, taptempof;
 uint8_t r, g, b, erase, e, eigth, preveigth;
 
-
 // MIDI stuff
 uint8_t  miditap, pmiditap, miditap2, midistep, pmidistep, miditempo, midinoise;
 uint8_t midi_note_check;
-
 
 
 void setup() {
@@ -631,6 +632,7 @@ void BUTTONS() {
       play = 1;
       ratepot = (analogRead(POT_LEFT));
       taptempo = ratepot << 14;
+      sample_rate = map(analogRead(POT_RIGHT), 0, 1023, 40, 255);
     }
     revbutton = digitalRead(PLAY);
     if (revbutton == 0 && prevrevbutton == 1) {
