@@ -1,5 +1,7 @@
 // DAM DRUM 2
 
+#include <Arduino.h>
+
 uint16_t length0 = 3994;
 uint16_t length1 = 6448;
 uint16_t length2 = 2808;

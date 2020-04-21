@@ -1,5 +1,7 @@
 // DEPENDENCIES
 
+#include <Arduino.h>
+
 // use MIDI in build flags to enable MIDI
 #ifdef ENABLE_MIDI 
 #include <MIDI.h>
@@ -132,6 +134,12 @@ int shift_time;
 int shift_time_latch;
 byte printer = 0;
 uint32_t erase_led;
+
+int midi_note_on();
+void LEDS();
+void BUTTONS();
+void RECORD();
+
 void setup() {
   randomSeed(analogRead(POT_LEFT));
   if (printer == 1) {
