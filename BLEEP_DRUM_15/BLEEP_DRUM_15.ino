@@ -6,31 +6,26 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 #include <Bounce2.h>
 #define BOUNCE_LOCK_OUT
 
-Bounce debouncerRed = Bounce();
-Bounce debouncerGreen = Bounce();
-Bounce debouncerBlue = Bounce();
-Bounce debouncerYellow = Bounce();
-
-// BUTTONS
 #define red_pin 2
 #define blue_pin 7
 #define green_pin 3
 #define yellow_pin 4
-
 #define PLAY 8    // D8
 #define REC 19    // A5
 #define TAP 18    // A4
 #define SHIFT 17  // A3
-
-// LEDs
 #define LED_RED 6
 #define LED_GREEN 5
 #define LED_BLUE 9
-
-// POTS
 #define POT_LEFT 0
 #define POT_RIGHT 1
+#define AUDIO_CLOCK 12
+#define DAC_CS 10
 
+Bounce debouncerRed = Bounce();
+Bounce debouncerGreen = Bounce();
+Bounce debouncerBlue = Bounce();
+Bounce debouncerYellow = Bounce();
 
 uint32_t cm, pm;
 const char noise_table[] PROGMEM = {};
@@ -125,9 +120,8 @@ void setup() {
   }
   cli();
 
-  pinMode (12, OUTPUT); pinMode (13, OUTPUT); pinMode (11, OUTPUT); pinMode (10, OUTPUT);
-  pinMode (9, OUTPUT); pinMode (5, OUTPUT);  pinMode (6, OUTPUT);
-  pinMode (16, OUTPUT);
+  pinMode (AUDIO_CLOCK, OUTPUT); pinMode (DAC_CS, OUTPUT);
+  pinMode (LED_BLUE, OUTPUT); pinMode (LED_RED, OUTPUT);  pinMode (LED_GREEN, OUTPUT);
 
   pinMode (PLAY, INPUT);     digitalWrite(PLAY, HIGH);  //play
   pinMode (REC, INPUT);     digitalWrite (REC, HIGH); //rec
@@ -149,28 +143,28 @@ void setup() {
   debouncerRed.interval(2); // interval in ms
 
   delay(100);
-  /*
+  #ifdef MIDI
     if (digitalRead(17) == LOW) {
-      analogWrite(6, 64); //green
+      analogWrite(LED_GREEN, 64); //green
       MIDI.begin(3);
       delay(20000);
 
     }
     else if (digitalRead(2) == LOW) {
-      analogWrite(5, 64); //RED
+      analogWrite(LED_RED, 64); //RED
       MIDI.begin(1);
       delay(20000); // we're messing with the timers so this isn't actually 20000 Millis
 
     }
     else if (digitalRead(19) == LOW) {
-      analogWrite(9, 64); //Blue
+      analogWrite(LED_BLUE, 64); //Blue
       MIDI.begin(2);
       delay(20000);
 
     }
     else if (digitalRead(18) == LOW) {
-      analogWrite(5, 48); //yellow
-      analogWrite(6, 16);
+      analogWrite(LED_RED, 48); //yellow
+      analogWrite(LED_GREEN, 16);
 
       MIDI.begin(4);
       delay(20000);
@@ -183,6 +177,8 @@ void setup() {
 
     MIDI.turnThruOff();
   */
+  #endif
+
   //pinMode (16, INPUT); digitalWrite (16, HIGH);
   digitalWrite(16, HIGH);
   SPI.begin();
@@ -221,7 +217,7 @@ byte index_sine;
 uint32_t acc_sine;
 
 ISR(TIMER2_COMPA_vect) {
-  digitalWrite(12, 1);
+  digitalWrite(AUDIO_CLOCK, 1);
   dds_time++;
   OCR2A = 50;
 
@@ -404,10 +400,10 @@ ISR(TIMER2_COMPA_vect) {
     sample_out += sample_out * -2;
   }
   uint16_t dac_out = (0 << 15) | (1 << 14) | (1 << 13) | (1 << 12) | ( sample_out << 4 );
-  digitalWrite(10, LOW);
+  digitalWrite(DAC_CS, LOW);
   SPI.transfer(dac_out >> 8);
   SPI.transfer(dac_out & 255);
-  digitalWrite(10, HIGH);
+  digitalWrite(DAC_CS, HIGH);
 
   ///////////////////////////////////////////////////////////////////////////////
 
@@ -529,7 +525,7 @@ ISR(TIMER2_COMPA_vect) {
       accumulator5 = 0;
     }
   }
-  digitalWrite(12, 0);
+  digitalWrite(AUDIO_CLOCK, 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////loop
@@ -747,9 +743,9 @@ void RECORD() {
 
 void LEDS() {
 
-  analogWrite(9, bout >> 1); //Blue
-  analogWrite(6, (gout >> 1) + triggerled); //green
-  analogWrite(5, rout >> 1);
+  analogWrite(LED_BLUE, bout >> 1); //Blue
+  analogWrite(LED_GREEN, (gout >> 1) + triggerled); //green
+  analogWrite(LED_RED, rout >> 1);
 
   if (noise_mode == 1) {
     rout = r;
