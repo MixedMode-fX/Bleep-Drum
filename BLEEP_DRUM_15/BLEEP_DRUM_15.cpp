@@ -1,17 +1,4 @@
-// DEPENDENCIES
-
 #include <Arduino.h>
-
-// use ENABLE_MIDI in build flags to enable MIDI
-#ifdef ENABLE_MIDI 
-#include <MIDI.h>
-MIDI_CREATE_DEFAULT_INSTANCE();
-#endif
-
-#include <avr/pgmspace.h>
-#include <SPI.h>
-#include <Bounce2.h>
-#define BOUNCE_LOCK_OUT
 
 // SAMPLES DATA
 #include "sine.h"
@@ -24,6 +11,20 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 #else
 #include "samples_bleep.h"
 #endif
+
+// DEPENDENCIES
+
+#include <avr/pgmspace.h>
+#include <SPI.h>
+#include <Bounce2.h>
+#define BOUNCE_LOCK_OUT
+
+// use ENABLE_MIDI in build flags to enable MIDI
+#ifdef ENABLE_MIDI 
+#include <MIDI.h>
+MIDI_CREATE_DEFAULT_INSTANCE();
+#endif
+
 
 // PINOUT
 #define red_pin 2
