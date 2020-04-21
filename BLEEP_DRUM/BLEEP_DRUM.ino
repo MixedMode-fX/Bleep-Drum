@@ -47,7 +47,16 @@ https://github.com/jacobanana/Bleep-Drum
 #define MIDI_GREEN 36
 #define MIDI_YELLOW 37
 
+// SEQUENCER
+#define SEQUENCE_LENGTH 64
 
+#define DEFAULT_SAMPLE_RATE 55
+
+// DAC OUTPUTS
+#define OUTPUT_0 0
+#define OUTPUT_1 0
+#define OUTPUT_2 0
+#define OUTPUT_3 1
 
 // DEPENDENCIES
 
@@ -61,6 +70,7 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 
 // DAC
 #include <SPI.h>
+#define DAC_CS 10 // DAC chip select pin
 
 // AVR PROGRAM SPACE : https://www.nongnu.org/avr-libc/user-manual/pgmspace.html
 #include <avr/pgmspace.h>
@@ -76,6 +86,9 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 #else
 #include "samples_bleep.h"
 #endif
+
+// Sine for click track
+#include "sine.h"
 
 // PLAYBACK & TRIGGERS
 #include "sample_playback.h"
@@ -94,10 +107,6 @@ int sample[2];
 // Sequences
 uint8_t banko = 0; // this defines which 32 steps sequence to use. sequences are stored in a 1D array of length 128
 
-// Pot position sequences for the top 2 samples
-uint16_t B1_freq_sequence[128] = {}; // because of the amount of RAM we have available, we can only have 2. 
-uint16_t B2_freq_sequence[128] = {}; // Technically, there is enough space for 3 but that would feel awkward
-
 // current step in the sequence
 uint8_t loopstep = 0;
 uint8_t loopstepf = 0;
@@ -115,15 +124,8 @@ uint32_t accumulator_noise;
 long noise_p1, noise_p2;
 int sample_holder1;
 
-// Output selection
-#ifdef STEREO
-uint8_t outputs[4] = {1,1,1,0}; // kick is sent to its own output by default
-#else
-uint8_t outputs[] = {0,0,0,0};
-#endif
-
 // Sample Rate control
-uint8_t sample_rate = 40;
+uint8_t sample_rate = DEFAULT_SAMPLE_RATE;
 
 // Buttons 
 uint8_t recordbutton, precordbutton;
@@ -140,11 +142,27 @@ uint8_t onetime = 1;
 uint8_t trigger_step, triggerled, ptrigger_step;
 
 // Tap tempo, LEDs & other stuff
+uint32_t cm;
+uint32_t dds_time;
+const unsigned long dds_tune = 4294967296 / 9800; // 2^32/measured dds freq but this takes too long
+uint16_t click_pitch;
+uint8_t click_amp;
+uint16_t click_wait;
+
+uint8_t erase_latch;
+uint32_t erase_led;
+int shift_time;
+int shift_time_latch;
+uint8_t click_play, click_en;
+
+unsigned long raw1, raw2;
+unsigned long log1, log2;
+
 uint8_t t;
 long tapbank[2];
 long prev; // Previous time
 long prevtap;
-unsigned long taptempo = 8000000;
+unsigned long taptempo = 1000;
 unsigned long ratepot;
 uint8_t eee, ee;
 uint8_t shift, bankpg, bankpr, bout, rout, gout;
@@ -155,6 +173,12 @@ uint8_t r, g, b, erase, e, eigth, preveigth;
 // MIDI stuff
 uint8_t  miditap, pmiditap, miditap2, midistep, pmidistep, miditempo, midinoise;
 uint8_t midi_note_check;
+
+
+// Click Track
+int sine_sample;
+uint8_t index_sine;
+uint32_t acc_sine;
 
 
 void setup() {
@@ -170,13 +194,8 @@ void setup() {
   samples[2].setSpeed(157); // default snare is pitched up
   samples[3].setSpeed(128);
 
-  samples[0].setSpeedSequence(B1_freq_sequence);
-  samples[1].setSpeedSequence(B2_freq_sequence);
-  
-
   randomSeed(analogRead(0));
   cli(); // disable interrupt
-  taptempo = 4000000;
 
   // Output pins
   pinMode (12, OUTPUT); pinMode (13, OUTPUT); pinMode (11, OUTPUT); pinMode (10, OUTPUT);
@@ -217,30 +236,9 @@ void setup() {
       else {
         MIDI.begin(0);
       }
-
-  }
-  else { // press and hold TAP at boot + a pad to assign to 2nd output
-    MIDI.begin(0);
-    #ifdef STEREO
-    outputs[0] = digitalRead(PIN_RED);
-    outputs[1] = digitalRead(PIN_BLUE);
-    outputs[2] = digitalRead(PIN_GREEN);
-    outputs[3] = digitalRead(PIN_YELLOW);
-    outputs[4] = digitalRead(PIN_RED);
-    outputs[5] = digitalRead(PIN_BLUE);
-    #endif
   }
   delay(20000); // we're messing with the timers so this isn't actually 20000 Millis
   MIDI.turnThruOff();
-
-  // Enable Noise mode at boot
-  if (digitalRead(SHIFT) == 0) {
-    noise_mode = 1;
-  }
-  else {
-    noise_mode = 0;
-  }
-
 
   // SPI initialisation for DAC
   SPI.begin();
@@ -248,7 +246,7 @@ void setup() {
   /* Enable interrupt on timer2 == 127, with clk/8 prescaler. At 16MHz,
      this gives a timer interrupt at 15625Hz. */
   TIMSK2 = (1 << OCIE2A);
-  OCR2A = 128;
+  OCR2A = DEFAULT_SAMPLE_RATE; // sets the compare. measured at 9813Hz with OCR2A = 50
 
   /* clear/reset timer on match */
   TCCR2A = 1 << WGM21 | 0 << WGM20; /* CTC mode, reset on match */
@@ -260,10 +258,25 @@ void setup() {
 
   sei(); // enable interrupt
 
+  // Enable Noise mode at boot
+  if (digitalRead(SHIFT) == 0) {
+    noise_mode = 1;
+  }
+  else {
+    noise_mode = 0;
+  }
+
+
 }
 
 
+
+
+
+
+
 void loop() {
+  cm = millis();
 
   midi_note_check = midi_note_on();
 
@@ -281,85 +294,6 @@ void loop() {
   RECORD();
   POTS();
 
-  /////////////////////////////////////////////////////////////////  loopstep
-
-
-  taptempof = taptempo;
-
-  recordoffsettimer = micros() - prev ;
-  offsetamount = taptempof - (taptempof >> 2 );
-
-  if ((recordoffsettimer) > (offsetamount)) loopstepf = (loopstep + 1) % 32;
-
-  if (play == 1) {
-
-    if (onetime == 1) {
-      taptempo = 4000000;
-      onetime = 0;
-    }
-    else {
-      prevloopstep = loopstep;
-
-      if (recordmode == 1 && miditempo == 0 && micros() - prev > (taptempof)) {
-          prev = micros();
-          loopstep = (loopstep + 1) % 32;
-      }
-
-      if (miditempo == 1 && midistep == 1) loopstep = (loopstep + 1) % 32;
-      ptrigger_step = trigger_step;
-    }
-
-    samples[0].setLoopTrigger(loopstep + banko);
-    samples[1].setLoopTrigger(loopstep + banko);
-    samples[2].setLoopTrigger(loopstep + banko);
-    samples[3].setLoopTrigger(loopstep + banko);
-
-  }
-
-  if (play == 0) {
-    loopstep = 31; // reset sequencer to start on first step when pressing play
-    prev = 0;
-    samples[0].setLoopTrigger(0);
-    samples[1].setLoopTrigger(0);
-    samples[2].setLoopTrigger(0);
-    samples[3].setLoopTrigger(0);
-  }
-
-
-  for(uint8_t i=0; i<N_SAMPLES; i++){
-    
-    // live triggers
-    if(samples[i].getTriggerFlag()) {
-      samples[i].trigger();
-    }
-
-    // sequenced triggers
-    if(loopstep != prevloopstep && samples[i].getLoopTrigger() == 1){
-       // the first 2 samples use the 2nd phaser 
-      samples[i].trigger(i < 2);
-      // this allows a different playback speed for the sequenced sounds
-      if(i < 2) samples[i].setSpeed(samples[i].getSpeedStep(loopstepf + banko), 1);
-    }
-
-  }
-  
-  //////////////////////////////////////////////////////////////// T A P
-
-
-
-  if (shift == 1) {
-
-    if (bft == 1 || miditap2 == 1) {
-      t = !t;
-      tapbank[t] = ((micros()) - prevtap) >> 2;
-      taptempo = ((tapbank[0] + tapbank[1]) >> 1);
-      prevtap = micros();
-
-    }
-
-  }
-
-
 }
 
 
@@ -367,23 +301,24 @@ void loop() {
 
 void RECORD() {
 
+  pplaybutton = playbutton;
   playbutton = digitalRead(PLAY);
   if (playbutton != pplaybutton && playbutton == LOW && shift == 1) {
     miditempo = 0;
     play = !play;
   }
-  else {
-  }
-  pplaybutton = playbutton;
 
 
+  precordbutton = recordbutton;
   recordbutton = digitalRead(REC);
-  if (recordbutton == LOW && recordbutton != precordbutton) {
+  if (recordbutton == 0 && precordbutton == 1) {
     record = !record;
     play = 1;
+    erase_latch = 1;
+    eee = 0;
   }
-
-  else {
+  if (recordbutton == 1 && precordbutton == 0) {
+    erase_latch = 0;
   }
 
   if (play == 0) {
@@ -393,27 +328,26 @@ void RECORD() {
 
   ////////////////////////////////////////////////////////////////////erase
 
-  precordbutton = recordbutton;
-
-  if (playbutton == LOW && recordbutton == LOW) {
-    eee++;
-    if (eee >= 84) {
-      erase = 1;
-      play = 1;
-      record = 0;
-      samples[0].setStep(ee + banko, 0, 0);
-      samples[1].setStep(ee + banko, 0, 0);
-      samples[2].setStep(ee + banko, 0, 0);
-      samples[3].setStep(ee + banko, 0, 0);
-      ee++;
-      if (ee == 32) {
-        ee = 0;
+  if (recordbutton == 0) {
+    if (playbutton == 0 &&  erase_latch == 1) {
+      eee++;
+      if (eee >= 800) {
         eee = 0;
+        erase_latch = 0;
+        erase = 1;
+        erase_led = millis();
+        play = 1;
+        record = 0;
+        for(uint8_t i=0; i<N_SAMPLES; i++){
+          for (uint8_t j; j < 32; j++) {
+            samples[i].setStep(j + banko, 0, 0);
+          }
+        }
       }
     }
-
   }
-  else {
+
+  if (millis() - erase_led > 10000) {
     erase = 0;
   }
 
@@ -431,36 +365,10 @@ void RECORD() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void LEDS() {
+
   analogWrite(LED_BLUE, bout >> 1); //Blue
   analogWrite(LED_GREEN, (gout >> 1) + triggerled); //green
   analogWrite(LED_RED, rout >> 1);
-
-
-
-  if ( banko == 63) {
-
-    bankpr = 4;
-    bankpg = 0;
-    bankpb = 0;
-  }
-  if ( banko == 31) {
-    bankpr = 4;
-    bankpg = 4;
-    bankpb = 0;
-  }
-  if ( banko == 0) {
-    bankpr = 0;
-    bankpg = 0;
-    bankpb = 8;
-  }
-
-  if ( banko == 95) {
-    bankpr = 0;
-    bankpg = 3;
-    bankpb = 0;
-
-  }
-
 
   if (noise_mode == 1) {
     rout = r;
@@ -468,29 +376,19 @@ void LEDS() {
     bout = b;
     if (shift_latch == 1) {
       if (record == 0 && play == 0 ) {
-        r += sample[0] >> 3;
+        r += (sample[0] + sample[1]) >> 4;
         b += 4;
       }
     }
     if (shift_latch == 0) {
-
       if (record == 0 && play == 0 ) {
-        g += sample[0] >> 3;
+        g += (sample[0] + sample[1]) >> 4;
         b += 2;
-
       }
-
     }
   }
 
   preveigth = eigth;
-
-  if (erase == 1) {
-    e = 16;
-  }
-  if (erase == 0) {
-    e = 0;
-  }
 
   if (g > 1) {
     g--;
@@ -524,38 +422,25 @@ void LEDS() {
 
 
   if (play == 1 && record == 0) {
-    bout = b;
-    rout = r;
-    gout = g;
+    bout = b*!erase;
+    rout = r*!erase;
+    gout = g*!erase;
 
-
-    ///////////////////////////////////////////////////CHANGE TO ONLY += WHEN LOOPSTEP != PREVLOOPSTEP
-
-    if ( loopstep == 0 && prevloopstep == 1 ) {
-      r = 64;
-      g = 64;
-      b = 64;
-
+    if ( loopstep == 0 ) {
+      r = 12;
+      g = 15;
+      b = 12;
     }
-    /*
-    else  if( loopstep==16 ){
-     r=4;
-     g=64;
-     b=4;
-     }
-     */
-    else if ( loopstep % 4 == 0 && prevloopstep % 4 != 0 ) {
-      r += 64;
-      g += 64;
-      b += 64;
-
+    else if ( loopstep % 4 == 0) {
+      r = 5;
+      g = 5;
+      b = 5;
     }
     else {
       b = bankpb;
       r = bankpr;
       g = bankpg;
     }
-
 
   }
 
@@ -565,46 +450,52 @@ void LEDS() {
     gout = g;
 
     if ( loopstep == 0 ) {
-      r = 32;
-      g = 16;
+      r = 30;
+      g = 6;
       b = 6;
     }
-    else  if ( loopstep == 16 ) {
-      r = 32;
-      g = 0;
-      b = 0;
-    }
-
-    else if (loopstep % 4 == 0) {
-      r = 48;
-      g = 0;
-      b = 0;
+    else if ( loopstep % 4 == 0) {
+      r = 20;
+      g = 2;
+      b = 2;
     }
     else {
       b = bankpb;
       r = bankpr;
       g = bankpg;
     }
-
-
   }
-
-
 }
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 void BUTTONS() {
-  shift = digitalRead(SHIFT);
-  if (shift == 0 && prevshift == 1) shift_latch = !shift_latch;
   prevshift = shift;
+  shift = digitalRead(SHIFT);
+
+  if (shift == 0 && prevshift == 1) {
+    shift_latch = !shift_latch;
+    shift_time = 0;
+    shift_time_latch = 1;
+
+  }
+
+  if (shift == 0 && shift_time_latch == 1) {
+    shift_time++;
+    if (shift_time > 800 ) {
+      click_en = !click_en;
+      shift_time = 0;
+      shift_time_latch = 0;
+    }
+  }
+
 
 
   ///////////////////////////////////////////////////sequence select
 
   if (shift == 0 && recordbutton == 1) {
+
     if (samples[0].read() == 0 ) { //red
       banko = 63;
     }
@@ -630,10 +521,11 @@ void BUTTONS() {
 
     if (tapbutton == LOW) {
       play = 1;
-      ratepot = (analogRead(POT_LEFT));
+      ratepot = analogRead(POT_LEFT);
       taptempo = ratepot << 14;
-      sample_rate = map(analogRead(POT_RIGHT), 0, 1023, 40, 255);
+      sample_rate = map(analogRead(POT_RIGHT), 0, 1023, DEFAULT_SAMPLE_RATE, 255);
     }
+
     revbutton = digitalRead(PLAY);
     if (revbutton == 0 && prevrevbutton == 1) {
       playmode = !playmode;
@@ -655,32 +547,29 @@ void BUTTONS() {
 }
 
 void POTS(){
-    if (noise_mode == 0) {
-    // USE DAM POT MAPPINGS BECAUSE IT'S FATTER
-      samples[shift_latch * 2].setSpeed((analogRead(POT_LEFT) >> 1) + 40);
-      samples[shift_latch * 2 + 1].setSpeed((analogRead(POT_RIGHT) >> 2) + 2);
+
+  raw1 = (analogRead(POT_LEFT) - 1024) * -1;
+  log1 = raw1 * raw1;
+  raw2 = (analogRead(POT_RIGHT) - 1024) * -1;
+  log2 = raw2 * raw2;
+
+
+  if (noise_mode == 0) {
+      samples[shift_latch * 2].setSpeed((log1 >> 11) + 2);
+      samples[shift_latch * 2 + 1].setSpeed((log2 >> 11) + 42);
   }
 
   if (noise_mode == 1) {
 
-    if (midinoise == 1) {
-      samples[0].setSpeed((samples[0].getSpeed() >> 1) + 1);
-      samples[1].setSpeed((samples[1].getSpeed() >> 2) + 1);
-      samples[2].setSpeed((samples[2].getSpeed() + 1) << 4);
-      samples[3].setSpeed((samples[3].getSpeed() + 1) << 2);
+    if (shift_latch == 0) {
+      samples[0].setSpeed((log1 >> 11) + 2);
+      samples[1].setSpeed((log2 >> 12) + 2);
     }
-    if (midinoise == 0) {
-
-
-      if (shift_latch == 0) {
-        samples[0].setSpeed((analogRead(POT_LEFT) >> 1) + 1);
-        samples[1].setSpeed((analogRead(POT_RIGHT) >> 2) + 1);
-      }
-      if (shift_latch == 1) {
-        noise_p1 = (analogRead(POT_RIGHT) << 4); ////////////////MAKE ME BETTERERER
-        noise_p2 = (analogRead(POT_LEFT) << 2);
-      }
+    if (shift_latch == 1) {
+      noise_p1 = (log1 >> 6) + 1;
+      noise_p2 = (log2 >> 8) + 1;
     }
+
   }
 }
 

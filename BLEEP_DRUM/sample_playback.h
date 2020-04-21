@@ -21,7 +21,7 @@ class SamplePlayback{
             if (button_pin != 0) {
                 pinMode(button_pin, INPUT_PULLUP);
                 button_debouncer.attach(button_pin);
-                button_debouncer.interval(2);
+                button_debouncer.interval(1);
             }
         }
 
@@ -82,7 +82,6 @@ class SamplePlayback{
         }
         uint8_t getStep(uint8_t index){ return sequence[index]; }
 
-        void setSpeedSequence(uint16_t *s){ speed_sequence = s; }
         void setSpeedStep(uint8_t index, uint16_t value){ speed_sequence[index] = value; }
         uint16_t getSpeedStep(uint8_t index){ return speed_sequence[index]; }
 
@@ -104,8 +103,8 @@ class SamplePlayback{
         uint8_t trigger_flag;
 
         // Sequencer
-        uint8_t sequence[128] = {};
-        uint16_t *speed_sequence; // not enough RAM for 4x speed sequences...
+        uint8_t sequence[SEQUENCE_LENGTH] = {};
+        uint16_t speed_sequence[SEQUENCE_LENGTH] = {};
         uint8_t loop_trigger;
 };
 
