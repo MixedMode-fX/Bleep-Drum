@@ -168,25 +168,25 @@ void setup() {
 
   delay(100);
   #ifdef ENABLE_MIDI
-    if (digitalRead(17) == LOW) {
+    if (digitalRead(green_pin) == LOW) {
       analogWrite(LED_GREEN, 64); //green
       MIDI.begin(3);
       delay(20000);
 
     }
-    else if (digitalRead(2) == LOW) {
+    else if (digitalRead(red_pin) == LOW) {
       analogWrite(LED_RED, 64); //RED
       MIDI.begin(1);
       delay(20000); // we're messing with the timers so this isn't actually 20000 Millis
 
     }
-    else if (digitalRead(19) == LOW) {
+    else if (digitalRead(blue_pin) == LOW) {
       analogWrite(LED_BLUE, 64); //Blue
       MIDI.begin(2);
       delay(20000);
 
     }
-    else if (digitalRead(18) == LOW) {
+    else if (digitalRead(yellow_pin) == LOW) {
       analogWrite(LED_RED, 48); //yellow
       analogWrite(LED_GREEN, 16);
 
