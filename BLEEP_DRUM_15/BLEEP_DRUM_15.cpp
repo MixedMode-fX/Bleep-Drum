@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 
-// use MIDI in build flags to enable MIDI
+// use ENABLE_MIDI in build flags to enable MIDI
 #ifdef ENABLE_MIDI 
 #include <MIDI.h>
 MIDI_CREATE_DEFAULT_INSTANCE();
