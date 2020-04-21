@@ -141,10 +141,6 @@ void BUTTONS();
 void RECORD();
 
 void setup() {
-  randomSeed(analogRead(POT_LEFT));
-  if (printer == 1) {
-    Serial.begin(9600);
-  }
   cli();
 
   pinMode (AUDIO_CLOCK, OUTPUT); pinMode (DAC_CS, OUTPUT);
@@ -563,9 +559,6 @@ void loop() {
   if (printer == 1) {
     if (cm - pm > 10000) {
       pm = cm;
-      Serial.println(eee);
-      Serial.println(erase);
-      Serial.println();
     }
   }
 
