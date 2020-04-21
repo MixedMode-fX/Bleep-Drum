@@ -1,11 +1,29 @@
+// DEPENDENCIES
+
+// use MIDI in build flags to enable MIDI
+#ifdef MIDI 
 #include <MIDI.h>
 MIDI_CREATE_DEFAULT_INSTANCE();
+#endif
+
 #include <avr/pgmspace.h>
-#include "samples.h"
 #include <SPI.h>
 #include <Bounce2.h>
 #define BOUNCE_LOCK_OUT
 
+// SAMPLES DATA
+#include "sine.h"
+#ifdef DAM
+#include "samples_dam.h"
+#elif DAM2
+#include "samples_dam2.h"
+#elif DAM3
+#include "samples_dam3.h"
+#else
+#include "samples_bleep.h"
+#endif
+
+// PINOUT
 #define red_pin 2
 #define blue_pin 7
 #define green_pin 3
@@ -22,6 +40,7 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 #define AUDIO_CLOCK 12
 #define DAC_CS 10
 
+// INIT
 Bounce debouncerRed = Bounce();
 Bounce debouncerGreen = Bounce();
 Bounce debouncerBlue = Bounce();
@@ -176,7 +195,7 @@ void setup() {
     }
 
     MIDI.turnThruOff();
-  */
+
   #endif
 
   //pinMode (16, INPUT); digitalWrite (16, HIGH);
@@ -357,22 +376,22 @@ ISR(TIMER2_COMPA_vect) {
   //sine_sample = ((sine_table[index_sine]));
 
   if (playmode == 0) { //reverse
-    snare_sample = (pgm_read_byte(&snare_table[(indexr)])) - 127;
-    kick_sample = (pgm_read_byte(&kick_table[(index2r)])) - 127;
-    hat_sample = (pgm_read_byte(&tick_table[(index3r)])) - 127;
-    bass_sample = (((pgm_read_byte(&bass_table[(index4r)])))) - 127;
+    snare_sample = (pgm_read_byte(&table2[(indexr)])) - 127;
+    kick_sample = (pgm_read_byte(&table3[(index2r)])) - 127;
+    hat_sample = (pgm_read_byte(&table0[(index3r)])) - 127;
+    bass_sample = (((pgm_read_byte(&table1[(index4r)])))) - 127;
 
-    B1_freq_sample = pgm_read_byte(&tick_table[(index2vr)]) - 127;
-    B2_freq_sample = (pgm_read_byte(&bass_table[(index4vr)])) - 127;
+    B1_freq_sample = pgm_read_byte(&table0[(index2vr)]) - 127;
+    B2_freq_sample = (pgm_read_byte(&table1[(index4vr)])) - 127;
   }
 
   if (playmode == 1) {
-    snare_sample = (pgm_read_byte(&snare_table[(index3)])) - 127;
-    kick_sample = (pgm_read_byte(&kick_table[(index4)])) - 127;
-    hat_sample = (pgm_read_byte(&tick_table[(index)])) - 127;
-    bass_sample = (((pgm_read_byte(&bass_table[(index2)])))) - 127;
-    B1_freq_sample = pgm_read_byte(&tick_table[(index_freq_1)]) - 127;
-    B2_freq_sample = (pgm_read_byte(&bass_table[(index_freq_2)])) - 127;
+    snare_sample = (pgm_read_byte(&table2[(index3)])) - 127;
+    kick_sample = (pgm_read_byte(&table3[(index4)])) - 127;
+    hat_sample = (pgm_read_byte(&table0[(index)])) - 127;
+    bass_sample = (((pgm_read_byte(&table1[(index2)])))) - 127;
+    B1_freq_sample = pgm_read_byte(&table0[(index_freq_1)]) - 127;
+    B2_freq_sample = (pgm_read_byte(&table1[(index_freq_2)])) - 127;
 
     noise_sample = (((pgm_read_byte(&sine_table[(index5)])))) - 127;
 
@@ -423,12 +442,12 @@ ISR(TIMER2_COMPA_vect) {
   }
 
   if (playmode == 0) {
-    indexr = (index3 - snare_length) * -1;
-    index2r = (index4 - kick_length) * -1;
-    index3r = (index - tick_length) * -1;
-    index4r = (index2 - bass_length) * -1;
-    index2vr = (index_freq_1 - tick_length) * -1;
-    index4vr = (index_freq_2 - bass_length) * -1;
+    indexr = (index3 - length2) * -1;
+    index2r = (index4 - length3) * -1;
+    index3r = (index - length0) * -1;
+    index4r = (index2 - length1) * -1;
+    index2vr = (index_freq_1 - length0) * -1;
+    index4vr = (index_freq_2 - length1) * -1;
 
   }
 
@@ -440,7 +459,7 @@ ISR(TIMER2_COMPA_vect) {
       accumulator += pot1;
     }
     index = (accumulator >> (6));
-    if (index > tick_length) {
+    if (index > length0) {
       index = 0;
       accumulator = 0;
       B1_latch = 0;
@@ -455,7 +474,7 @@ ISR(TIMER2_COMPA_vect) {
       accumulator2 += pot2;
     }
     index2 = (accumulator2 >> (6));
-    if (index2 > bass_length) {
+    if (index2 > length1) {
       index2 = 0;
       accumulator2 = 0;
       B2_latch = 0;
@@ -465,7 +484,7 @@ ISR(TIMER2_COMPA_vect) {
   if (B3_latch == 1) {
     accumulator3 += (midicc3);
     index3 = (accumulator3 >> 6);
-    if (index3 > snare_length) {
+    if (index3 > length2) {
 
       index3 = 0;
       accumulator3 = 0;
@@ -477,7 +496,7 @@ ISR(TIMER2_COMPA_vect) {
     accumulator4 += (midicc4);
     // index4b=(accumulator4 >> (6));
     index4 = (accumulator4 >> (6));
-    if (index4 > kick_length) {
+    if (index4 > length3) {
 
       index4 = 0;
       accumulator4 = 0;
@@ -492,7 +511,7 @@ ISR(TIMER2_COMPA_vect) {
     kfe = kf;
   }
 
-  if (index_freq_1 > tick_length) {
+  if (index_freq_1 > length0) {
     kf = 0;
     index_freq_1 = 0;
     accu_freq_1 = 0;
@@ -510,7 +529,7 @@ ISR(TIMER2_COMPA_vect) {
   if (B2_seq_trigger == 1 && tiggertempo == 1) {
     pf = B2_freq_sequence[loopstep + banko];
   }
-  if (index_freq_2 > bass_length) {
+  if (index_freq_2 > length1) {
     pf = 0;
     index_freq_2 = 0;
     accu_freq_2 = 0;
@@ -978,7 +997,7 @@ void BUTTONS() {
 }
 
 int midi_note_on() {
-  /*
+  #ifdef MIDI
     int type, note, velocity, channel, d1, d2;
     byte r = MIDI.read();
     if (r == 1) {                  // Is there a MIDI message incoming ?
@@ -1022,6 +1041,8 @@ int midi_note_on() {
     else {
       note = 0;
     }
-  */
+    return note;
+  #else 
   return 0;
+  #endif
 }
