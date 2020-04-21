@@ -1,7 +1,7 @@
 // DEPENDENCIES
 
 // use MIDI in build flags to enable MIDI
-#ifdef MIDI 
+#ifdef ENABLE_MIDI 
 #include <MIDI.h>
 MIDI_CREATE_DEFAULT_INSTANCE();
 #endif
@@ -162,7 +162,7 @@ void setup() {
   debouncerRed.interval(2); // interval in ms
 
   delay(100);
-  #ifdef MIDI
+  #ifdef ENABLE_MIDI
     if (digitalRead(17) == LOW) {
       analogWrite(LED_GREEN, 64); //green
       MIDI.begin(3);
@@ -997,7 +997,7 @@ void BUTTONS() {
 }
 
 int midi_note_on() {
-  #ifdef MIDI
+  #ifdef ENABLE_MIDI
     int type, note, velocity, channel, d1, d2;
     byte r = MIDI.read();
     if (r == 1) {                  // Is there a MIDI message incoming ?
