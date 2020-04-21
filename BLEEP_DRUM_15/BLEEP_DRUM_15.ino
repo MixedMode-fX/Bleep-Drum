@@ -11,10 +11,26 @@ Bounce debouncerGreen = Bounce();
 Bounce debouncerBlue = Bounce();
 Bounce debouncerYellow = Bounce();
 
+// BUTTONS
 #define red_pin 2
-#define blue_pin 19
-#define green_pin 17
-#define yellow_pin 18
+#define blue_pin 7
+#define green_pin 3
+#define yellow_pin 4
+
+#define PLAY 8    // D8
+#define REC 19    // A5
+#define TAP 18    // A4
+#define SHIFT 17  // A3
+
+// LEDs
+#define LED_RED 6
+#define LED_GREEN 5
+#define LED_BLUE 9
+
+// POTS
+#define POT_LEFT 0
+#define POT_RIGHT 1
+
 
 uint32_t cm, pm;
 const char noise_table[] PROGMEM = {};
@@ -103,7 +119,7 @@ int shift_time_latch;
 byte printer = 0;
 uint32_t erase_led;
 void setup() {
-  randomSeed(analogRead(0));
+  randomSeed(analogRead(POT_LEFT));
   if (printer == 1) {
     Serial.begin(9600);
   }
@@ -113,11 +129,10 @@ void setup() {
   pinMode (9, OUTPUT); pinMode (5, OUTPUT);  pinMode (6, OUTPUT);
   pinMode (16, OUTPUT);
 
-  pinMode (3, INPUT);     digitalWrite(3, HIGH);  //play
-  pinMode (4, INPUT);     digitalWrite (4, HIGH); //rec
-  pinMode (8, INPUT);     digitalWrite (8, HIGH); //tap
-  pinMode (7, INPUT);     digitalWrite(7, HIGH);   //shift
-  pinMode (12, OUTPUT);
+  pinMode (PLAY, INPUT);     digitalWrite(PLAY, HIGH);  //play
+  pinMode (REC, INPUT);     digitalWrite (REC, HIGH); //rec
+  pinMode (TAP, INPUT);     digitalWrite (TAP, HIGH); //tap
+  pinMode (SHIFT, INPUT);     digitalWrite(SHIFT, HIGH);   //shift
 
   pinMode (green_pin, INPUT_PULLUP);   //low left clap green
   pinMode (yellow_pin, INPUT_PULLUP);   // low right kick yellow
@@ -190,7 +205,7 @@ void setup() {
 
 
   sei();
-  if (digitalRead(7) == 0) {
+  if (digitalRead(SHIFT) == 0) {
     noise_mode = 1;
   }
   else {
@@ -549,7 +564,7 @@ void loop() {
   button3 = debouncerGreen.read();
   button4 = debouncerYellow.read();
 
-  tapb = digitalRead(8);
+  tapb = digitalRead(TAP);
 
   if (button1 == 0 && pbutton1 == 1) {
     bf1 = 1;
@@ -623,9 +638,9 @@ void loop() {
   BUTTONS();
   RECORD();
 
-  raw1 = (analogRead(1) - 1024) * -1;
+  raw1 = (analogRead(POT_LEFT) - 1024) * -1;
   log1 = raw1 * raw1;
-  raw2 = (analogRead(0) - 1024) * -1;
+  raw2 = (analogRead(POT_RIGHT) - 1024) * -1;
   log2 = raw2 * raw2;
 
   if (noise_mode == 0) {
@@ -652,14 +667,14 @@ void loop() {
 
 void RECORD() {
   pplaybutton = playbutton;
-  playbutton = digitalRead(3);
+  playbutton = digitalRead(PLAY);
   if (pplaybutton == 1 && playbutton == 0 && shift == 1 && recordbutton == 1 ) {
     play = !play;
   }
 
 
   precordbutton = recordbutton;
-  recordbutton = digitalRead(4);
+  recordbutton = digitalRead(REC);
   if (recordbutton == 0 && precordbutton == 1) {
     record = !record;
     play = 1;
@@ -841,7 +856,7 @@ void LEDS() {
 void BUTTONS() {
   prevshift = shift;
 
-  shift = digitalRead(7);
+  shift = digitalRead(SHIFT);
 
   if (shift == 0 && prevshift == 1) {
     shift_latch++;
@@ -889,10 +904,10 @@ void BUTTONS() {
 
     if (tapb == LOW) {
       play = 1;
-      ratepot = (analogRead(14));
+      ratepot = (analogRead(POT_LEFT));
       taptempo = ratepot << 14;
     }
-    revbutton = digitalRead(3);
+    revbutton = digitalRead(PLAY);
     if (revbutton == 0 && prevrevbutton == 1) {
       playmode++;
       playmode %= 2;
