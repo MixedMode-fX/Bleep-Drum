@@ -1021,7 +1021,6 @@ void BUTTONS() {
 }
 
 int midi_note_on() {
-<<<<<<< HEAD:BLEEP_DRUM_15/BLEEP_DRUM_15.cpp
   #ifdef ENABLE_MIDI
     int type, note, velocity, channel, d1, d2;
     byte r = MIDI.read();
@@ -1037,46 +1036,29 @@ int midi_note_on() {
 
           break;
         case 0x80: //note off
-=======
-
-  int type, note, velocity, channel, d1, d2;
-  byte r = MIDI.read();
-  if (r == 1) {                  // Is there a MIDI message incoming ?
-    byte type = MIDI.getType();
-    switch (type) {
-      case 0x90: //note on. For some reasong "NoteOn" won't work enven though it's declared in midi_Defs.h
-        note = MIDI.getData1();
-        velocity = MIDI.getData2();
-        if (velocity == 0) {
->>>>>>> master:BLEEP_DRUM_15/BLEEP_DRUM_15.ino
           note = 0;
-        }
+          break;
 
-        break;
-      case 0x80: //note off
-        note = 0;
-        break;
+        case 0xB0: //control change
+          if (MIDI.getData1() == 70) {
+            midicc1 = (MIDI.getData2() << 2) + 3;
+          }
 
-      case 0xB0: //control change
-        if (MIDI.getData1() == 70) {
-          midicc1 = (MIDI.getData2() << 2) + 3;
-        }
+          if (MIDI.getData1() == 71) {
+            midicc2 = (MIDI.getData2() << 2) + 3;
+          }
 
-        if (MIDI.getData1() == 71) {
-          midicc2 = (MIDI.getData2() << 2) + 3;
-        }
+          if (MIDI.getData1() == 72) {
+            midicc3 = (MIDI.getData2() << 2);
+          }
 
-        if (MIDI.getData1() == 72) {
-          midicc3 = (MIDI.getData2() << 2);
-        }
+          if (MIDI.getData1() == 73) {
+            midicc4 = (MIDI.getData2() << 2);
+          }
 
-        if (MIDI.getData1() == 73) {
-          midicc4 = (MIDI.getData2() << 2);
-        }
-
-      default:
-        note = 0;
-
+        default:
+          note = 0;
+      }
     }
     return note;
   #else 
